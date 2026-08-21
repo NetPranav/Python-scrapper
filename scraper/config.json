@@ -1,0 +1,13 @@
+{
+  "CONFERENCE_HEADER": "International Conference on Advances in Computer Research on Science Engineering and Technology, 2026",
+  "FOOTER_URL": "www.acroset.in",
+  "LINE_SPACING_FACTOR": 1.45,
+  "WORD_SPACING": 1.5,
+  "TITLE_FONT_SIZE": 12,
+  "AUTHORS_FONT_SIZE": 9.5,
+  "ABSTRACT_FONT_SIZE": 10,
+  "KEYWORDS_FONT_SIZE": 10,
+  "HEADER_FONT_SIZE": 8.5,
+  "FOOTER_URL_FONT_SIZE": 9,
+  "FOOTER_PAGE_FONT_SIZE": 10
+}
