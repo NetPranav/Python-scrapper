@@ -752,9 +752,9 @@ def _body_page_handler(canvas, doc):
 
 def _estimate_paper_height(paper, styles, avail_width):
     """
-    Pre-calculate the rendered height of a paper block using ReportLab's
-    wrap() method. This gives pixel-accurate height estimates for the
-    smart pairing algorithm.
+    Pre-calculate the exact rendered height of a paper block using ReportLab's
+    wrap() method. Gives accurate measurements of title, authors, affiliations,
+    abstract, and keywords without trailing separators.
     """
     st_title, st_authors, st_abstract, st_keywords = styles
 
@@ -764,7 +764,6 @@ def _estimate_paper_height(paper, styles, avail_width):
 
     authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=True)
 
-    # Create paragraph objects and measure their wrapped height
     p_title = Paragraph(title_safe, st_title)
     p_authors = Paragraph(authors_text, st_authors)
     p_affiliations = Paragraph(f'<i>{affiliations_text}</i>', st_authors) if affiliations_text else None
@@ -781,76 +780,136 @@ def _estimate_paper_height(paper, styles, avail_width):
             _, h = p.wrap(avail_width, 9999)
             total_h += h
 
-    # Add spaceAfter from styles: title(5) + authors(8) + abstract(5) + keywords(6)
+    # Space after: title (5) + authors (8) + abstract (5) + keywords (6)
     total_h += 5 + 8 + 5 + 6
-    # Add spacers: 4 (after authors) + 6 (after keywords) + 18 (dot sep) + 14
-    total_h += 4 + 6 + 18 + 14
-    # Safety buffer for frame padding and rounding
-    total_h += 15
+    # Spacer between authors and abstract
+    total_h += 4
+    # Safety buffer for line-wrapping variations
+    total_h += 6
 
     return total_h
 
 
-def _pair_papers_by_height(papers, heights, avail_height):
+def _pack_papers_optimally(papers, heights, avail_height):
     """
-    Smart pairing algorithm: pair tall papers with short papers so that
-    each page pair uses close to 100% of the available page height.
-
-    Strategy (greedy best-fit):
-      1. Create a list of (original_index, height) tuples
-      2. Sort by height descending
-      3. For each paper (starting from tallest), find the best partner
-         from the remaining papers that fits on the same page
-      4. If no partner fits, the paper goes solo
+    Optimal Multi-Fit Bin Packing Algorithm:
+    Partitions papers across pages such that:
+      1. Every page's total content height + separators <= avail_height.
+      2. The total number of pages is minimized.
+      3. All pages before the last page are packed as densely as possible
+         (maximizing squared fill sum), ensuring only the final page holds
+         any remaining partial fill.
+      4. No paper is split across page boundaries.
 
     Returns:
-        list of tuples: [(idx_a, idx_b), (idx_c,), (idx_d, idx_e), ...]
-        Each tuple is a group of original paper indices for one page.
+        list of tuples: [(idx_a, idx_b), (idx_c, idx_d, idx_e), ..., (idx_z,)]
+        Sorted by page fill percentage descending (fullest pages first).
     """
-    # Create indexed height list
-    indexed = [(i, heights[i]) for i in range(len(papers))]
-    indexed.sort(key=lambda x: x[1], reverse=True)
+    n = len(papers)
+    if n == 0:
+        return []
+    if n == 1:
+        return [(0,)]
 
-    used = set()
-    page_groups = []
+    def group_total_h(group, sep=32):
+        if not group:
+            return 0
+        return sum(heights[idx] for idx in group) + (len(group) - 1) * sep
 
-    for idx, h in indexed:
-        if idx in used:
-            continue
-        used.add(idx)
+    def can_fit(group):
+        # Fits if it can fit with at least compact separator (20pt)
+        return group_total_h(group, sep=20) <= avail_height
 
-        # Find best partner: the tallest remaining paper that still fits
-        remaining_space = avail_height - h
-        best_partner = None
-        best_partner_h = 0
+    # Sort paper indices descending by height
+    items = sorted(range(n), key=lambda i: heights[i], reverse=True)
 
-        for j_idx, j_h in indexed:
-            if j_idx in used:
-                continue
-            if j_h <= remaining_space and j_h > best_partner_h:
-                best_partner = j_idx
-                best_partner_h = j_h
+    # 1. Best-Fit Decreasing (BFD) Initial Solution
+    def solve_bfd():
+        bins = []
+        for item in items:
+            best_b = -1
+            min_residual = float('inf')
+            for b_idx, b in enumerate(bins):
+                cand = b + [item]
+                if can_fit(cand):
+                    res = avail_height - group_total_h(cand, sep=24)
+                    if res < min_residual:
+                        min_residual = res
+                        best_b = b_idx
+            if best_b != -1:
+                bins[best_b].append(item)
+            else:
+                bins.append([item])
+        return bins
 
-        if best_partner is not None:
-            used.add(best_partner)
-            page_groups.append((idx, best_partner))
-        else:
-            page_groups.append((idx,))
+    best_bins = solve_bfd()
+    min_bin_count = len(best_bins)
 
-    return page_groups
+    def calc_score(bins):
+        # Cubic score heavily rewards 90-100% full pages, concentrating slack in the last page
+        return sum((group_total_h(b, sep=24) / avail_height) ** 3 for b in bins)
+
+    best_score = calc_score(best_bins)
+
+    # 2. Local Search & Backtracking optimization for best sequencing
+    if n <= 100:
+        def backtrack(item_pos, current_bins):
+            nonlocal best_bins, min_bin_count, best_score
+            if len(current_bins) > min_bin_count:
+                return
+
+            if item_pos == n:
+                score = calc_score(current_bins)
+                if len(current_bins) < min_bin_count or (len(current_bins) == min_bin_count and score > best_score):
+                    min_bin_count = len(current_bins)
+                    best_score = score
+                    best_bins = [list(b) for b in current_bins]
+                return
+
+            item = items[item_pos]
+            candidates = []
+            for b_idx, b in enumerate(current_bins):
+                cand = b + [item]
+                if can_fit(cand):
+                    res = avail_height - group_total_h(cand, sep=24)
+                    candidates.append((res, b_idx))
+
+            candidates.sort(key=lambda x: x[0])  # tightest fit first
+
+            for _, b_idx in candidates:
+                current_bins[b_idx].append(item)
+                backtrack(item_pos + 1, current_bins)
+                current_bins[b_idx].pop()
+
+            if len(current_bins) + 1 <= min_bin_count:
+                current_bins.append([item])
+                backtrack(item_pos + 1, current_bins)
+                current_bins.pop()
+
+        try:
+            backtrack(0, [])
+        except Exception:
+            pass
+
+    # 3. Sort page groups so fullest pages come first (90-100% full)
+    # Only the very last page holds the remaining partial fill!
+    groups = [tuple(b) for b in best_bins if b]
+    groups.sort(key=lambda g: group_total_h(g, sep=24), reverse=True)
+
+    return groups
 
 
 def generate_body_pdf(papers, output_path):
     """
     Generate the body pages of the compiled PDF using ReportLab Platypus.
 
-    Uses a smart pairing algorithm:
-      1. Pre-calculates the rendered height of each paper
-      2. Pairs tall papers with short papers to minimize whitespace
+    Uses optimal bin packing:
+      1. Pre-calculates exact rendered height of each paper
+      2. Packs papers densely to eliminate half-empty pages before the last page
       3. Ensures no paper content splits across pages (KeepTogether)
-      4. Never puts more than MAX_PAPERS_PER_PAGE on a single page
+      4. Adaptively sizes separators based on page capacity
 
-    Returns a dict mapping paper_index → page_number.
+    Returns tuple (page_map, page_groups)
     """
     global _page_map
     _page_map = {}
@@ -879,7 +938,6 @@ def generate_body_pdf(papers, output_path):
     ])
 
     # ── Define paragraph styles ──
-    # Uses configurable spacing from top-level variables
     st_title = ParagraphStyle(
         'paper_title',
         fontName='Times-Bold',
@@ -937,25 +995,49 @@ def generate_body_pdf(papers, output_path):
         print(f"    [{i}] {heights[i]:6.1f}pt ({pct:4.1f}%)  "
               f"{bar}  {paper['title'][:50]}...")
 
-    # ── Step 2: Smart pairing ──
-    page_groups = _pair_papers_by_height(papers, heights, avail_height)
+    # ── Step 2: Optimal Dense Packing ──
+    page_groups = _pack_papers_optimally(papers, heights, avail_height)
 
-    print(f"\n  [PAIRING] Smart pairing result ({len(page_groups)} pages):")
+    print(f"\n  [PACKING] Dense page packing ({len(page_groups)} pages):")
     for pg_num, group in enumerate(page_groups):
         titles = [papers[idx]['title'][:45] + '...' for idx in group]
-        total_h = sum(heights[idx] for idx in group)
-        usage = (total_h / avail_height) * 100
-        print(f"    Page {pg_num+1}: {len(group)} paper(s), "
-              f"{usage:.0f}% filled -- {', '.join(titles)}")
+        k = len(group)
+        sep_h = 32 if k > 1 else 0
+        total_h = sum(heights[idx] for idx in group) + (k - 1) * sep_h
+        usage = min(100.0, (total_h / avail_height) * 100)
+        is_last = (pg_num == len(page_groups) - 1)
+        tag = " (Final Page)" if is_last else ""
+        print(f"    Page {pg_num+1}: {k} paper(s), "
+              f"{usage:.0f}% filled{tag} -- {', '.join(titles)}")
 
-    # ── Step 3: Build flowable elements in paired order ──
+    # ── Step 3: Build flowable elements in optimal page order ──
     elements = []
 
     for pg_idx, group in enumerate(page_groups):
         if pg_idx > 0:
             elements.append(PageBreak())
 
-        for paper_idx in group:
+        k = len(group)
+        group_base_h = sum(heights[idx] for idx in group)
+        remaining_space = avail_height - group_base_h
+
+        # Adaptively scale separator spacing to fit page comfortably
+        if k > 1:
+            sep_budget = remaining_space / (k - 1)
+            if sep_budget >= 36:
+                spacer_top = 6
+                spacer_bottom = 12
+            elif sep_budget >= 24:
+                spacer_top = 4
+                spacer_bottom = 8
+            else:
+                spacer_top = 2
+                spacer_bottom = 4
+        else:
+            spacer_top = 6
+            spacer_bottom = 12
+
+        for item_idx, paper_idx in enumerate(group):
             paper = papers[paper_idx]
 
             title_safe = html_escape(paper['title'])
@@ -979,16 +1061,22 @@ def generate_body_pdf(papers, output_path):
                 Paragraph(
                     f"<b>Keywords— </b><i>{keywords_safe}</i>", st_keywords
                 ),
-                Spacer(1, 6),
-                DotSeparator(CONTENT_WIDTH),
-                Spacer(1, 14),
             ])
+
+            # Only add separator between papers on the same page (not at the end of the page)
+            if item_idx < k - 1:
+                block_items.extend([
+                    Spacer(1, spacer_top),
+                    DotSeparator(CONTENT_WIDTH),
+                    Spacer(1, spacer_bottom),
+                ])
+
             paper_block = KeepTogether(block_items)
             elements.append(paper_block)
 
     # Build the PDF
     doc.build(elements)
-    return dict(_page_map)
+    return dict(_page_map), page_groups
 
 
 # ============================================================
@@ -1746,7 +1834,7 @@ def generate_invited_talks_pdf(output_path):
 # WORD DOCUMENT GENERATION
 # ============================================================
 
-def generate_word_output(papers, page_map, output_path):
+def generate_word_output(papers, page_groups, page_map, output_path):
     """
     Generate a Word (.docx) document with the same structure as the PDF:
     Cover Page (if available) + Table of Contents + Paper entries.
@@ -1802,7 +1890,6 @@ def generate_word_output(papers, page_map, output_path):
                             img_data = base64.b64decode(encoded)
                             img_stream = io.BytesIO(img_data)
                             run = p.add_run()
-                            # 595 width in pdf is ~8.27 inches (72 dpi). Word usually uses 96 dpi for web px.
                             w_inches = blk.get('width', 150) / 72.0
                             run.add_picture(img_stream, width=Inches(w_inches))
                         except Exception as e:
@@ -1926,74 +2013,79 @@ def generate_word_output(papers, page_map, output_path):
         run_auth.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
     # ══════════════════════════════════════════════════
-    # BODY — PAPER ENTRIES
+    # BODY — PAPER ENTRIES (Grouped by Page)
     # ══════════════════════════════════════════════════
 
     doc.add_page_break()
 
-    for idx, paper in enumerate(papers):
-        if idx > 0:
-            # Dot separator between papers
-            sep = doc.add_paragraph()
-            sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            sep.paragraph_format.space_before = Pt(6)
-            sep.paragraph_format.space_after = Pt(10)
-            run_sep = sep.add_run('●  ' * 10 + '●')
-            run_sep.font.size = Pt(7)
-            run_sep.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+    for pg_idx, group in enumerate(page_groups):
+        if pg_idx > 0:
+            doc.add_page_break()
 
-        # ── Title ──
-        title_para = doc.add_paragraph()
-        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_para.paragraph_format.space_before = Pt(4)
-        title_para.paragraph_format.space_after = Pt(5)
-        run_t = title_para.add_run(paper['title'])
-        run_t.bold = True
-        run_t.font.size = Pt(TITLE_FONT_SIZE)
-        run_t.font.name = 'Times New Roman'
+        for item_idx, paper_idx in enumerate(group):
+            paper = papers[paper_idx]
+            if item_idx > 0:
+                # Dot separator between papers on the same page
+                sep = doc.add_paragraph()
+                sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                sep.paragraph_format.space_before = Pt(6)
+                sep.paragraph_format.space_after = Pt(10)
+                run_sep = sep.add_run('●  ' * 10 + '●')
+                run_sep.font.size = Pt(7)
+                run_sep.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 
-        # ── Authors ──
-        authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=False)
+            # ── Title ──
+            title_para = doc.add_paragraph()
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            title_para.paragraph_format.space_before = Pt(4)
+            title_para.paragraph_format.space_after = Pt(5)
+            run_t = title_para.add_run(paper['title'])
+            run_t.bold = True
+            run_t.font.size = Pt(TITLE_FONT_SIZE)
+            run_t.font.name = 'Times New Roman'
 
-        auth_para = doc.add_paragraph()
-        auth_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        auth_para.paragraph_format.space_after = Pt(2)
-        run_a = auth_para.add_run(authors_text)
-        run_a.font.size = Pt(AUTHORS_FONT_SIZE)
-        run_a.font.name = 'Times New Roman'
+            # ── Authors ──
+            authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=False)
 
-        if affiliations_text:
-            aff_para = doc.add_paragraph()
-            aff_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            aff_para.paragraph_format.space_after = Pt(8)
-            run_aff = aff_para.add_run(affiliations_text)
-            run_aff.italic = True
-            run_aff.font.size = Pt(AUTHORS_FONT_SIZE - 1)
-            run_aff.font.name = 'Times New Roman'
+            auth_para = doc.add_paragraph()
+            auth_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            auth_para.paragraph_format.space_after = Pt(2)
+            run_a = auth_para.add_run(authors_text)
+            run_a.font.size = Pt(AUTHORS_FONT_SIZE)
+            run_a.font.name = 'Times New Roman'
 
-        # ── Abstract ──
-        abs_para = doc.add_paragraph()
-        abs_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        abs_para.paragraph_format.space_after = Pt(5)
-        run_abs_label = abs_para.add_run('Abstract— ')
-        run_abs_label.bold = True
-        run_abs_label.font.size = Pt(ABSTRACT_FONT_SIZE)
-        run_abs_label.font.name = 'Times New Roman'
-        run_abs_text = abs_para.add_run(paper['abstract'])
-        run_abs_text.font.size = Pt(ABSTRACT_FONT_SIZE)
-        run_abs_text.font.name = 'Times New Roman'
+            if affiliations_text:
+                aff_para = doc.add_paragraph()
+                aff_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                aff_para.paragraph_format.space_after = Pt(8)
+                run_aff = aff_para.add_run(affiliations_text)
+                run_aff.italic = True
+                run_aff.font.size = Pt(AUTHORS_FONT_SIZE - 1)
+                run_aff.font.name = 'Times New Roman'
 
-        # ── Keywords ──
-        kw_para = doc.add_paragraph()
-        kw_para.paragraph_format.space_after = Pt(6)
-        run_kw_label = kw_para.add_run('Keywords— ')
-        run_kw_label.bold = True
-        run_kw_label.font.size = Pt(KEYWORDS_FONT_SIZE)
-        run_kw_label.font.name = 'Times New Roman'
-        run_kw_text = kw_para.add_run(paper['keywords'])
-        run_kw_text.italic = True
-        run_kw_text.font.size = Pt(KEYWORDS_FONT_SIZE)
-        run_kw_text.font.name = 'Times New Roman'
+            # ── Abstract ──
+            abs_para = doc.add_paragraph()
+            abs_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            abs_para.paragraph_format.space_after = Pt(5)
+            run_abs_label = abs_para.add_run('Abstract— ')
+            run_abs_label.bold = True
+            run_abs_label.font.size = Pt(ABSTRACT_FONT_SIZE)
+            run_abs_label.font.name = 'Times New Roman'
+            run_abs_text = abs_para.add_run(paper['abstract'])
+            run_abs_text.font.size = Pt(ABSTRACT_FONT_SIZE)
+            run_abs_text.font.name = 'Times New Roman'
+
+            # ── Keywords ──
+            kw_para = doc.add_paragraph()
+            kw_para.paragraph_format.space_after = Pt(6)
+            run_kw_label = kw_para.add_run('Keywords— ')
+            run_kw_label.bold = True
+            run_kw_label.font.size = Pt(KEYWORDS_FONT_SIZE)
+            run_kw_label.font.name = 'Times New Roman'
+            run_kw_text = kw_para.add_run(paper['keywords'])
+            run_kw_text.italic = True
+            run_kw_text.font.size = Pt(KEYWORDS_FONT_SIZE)
+            run_kw_text.font.name = 'Times New Roman'
 
     # ── Footer on each page ──
     for section in doc.sections:
@@ -2087,7 +2179,7 @@ def main():
     # ── Generate body PDF (always needed for page_map) ──
     body_temp = os.path.join(output_folder, "_body_temp.pdf")
     print(f"\n[PROCESS] Generating body pages...")
-    page_map = generate_body_pdf(papers, body_temp)
+    page_map, page_groups = generate_body_pdf(papers, body_temp)
 
     print(f"\n  Page assignments:")
     for i, p in enumerate(papers):
@@ -2098,7 +2190,7 @@ def main():
         # ── Word output ──
         output_path = os.path.join(output_folder, "compiled_output.docx")
         print(f"\n[PROCESS] Generating Word document -> {output_path}")
-        success = generate_word_output(papers, page_map, output_path)
+        success = generate_word_output(papers, page_groups, page_map, output_path)
         # Cleanup temp body PDF
         if os.path.exists(body_temp):
             os.remove(body_temp)
