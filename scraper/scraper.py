@@ -989,10 +989,17 @@ def _pack_papers_optimally(papers, avail_height):
 
     best_score = calc_score(best_bins)
 
-    # 2. Local Search & Backtracking optimization for best sequencing
+    # 2. Local Search & Backtracking optimization for best sequencing (bounded budget)
     if n <= 100:
+        step_count = 0
+        max_steps = 2500
+
         def backtrack(item_pos, current_bins):
-            nonlocal best_bins, min_bin_count, best_score
+            nonlocal best_bins, min_bin_count, best_score, step_count
+            step_count += 1
+            if step_count > max_steps:
+                return
+
             if len(current_bins) > min_bin_count:
                 return
 
@@ -1016,11 +1023,13 @@ def _pack_papers_optimally(papers, avail_height):
             candidates.sort(key=lambda x: x[0])  # tightest fit first
 
             for _, b_idx in candidates:
+                if step_count > max_steps:
+                    break
                 current_bins[b_idx].append(item)
                 backtrack(item_pos + 1, current_bins)
                 current_bins[b_idx].pop()
 
-            if len(current_bins) + 1 <= min_bin_count:
+            if len(current_bins) + 1 <= min_bin_count and step_count <= max_steps:
                 current_bins.append([item])
                 backtrack(item_pos + 1, current_bins)
                 current_bins.pop()
