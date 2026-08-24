@@ -1,6 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Force UTF-8 encoding in Windows command prompt
+chcp 65001 >nul 2>&1
+set PYTHONIOENCODING=utf-8
+set PYTHONUTF8=1
+
 echo ========================================================
 echo   ACROSET Paper Compiler - Complete One-Time Setup
 echo ========================================================

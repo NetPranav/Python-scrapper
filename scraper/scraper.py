@@ -23,7 +23,20 @@ import sys
 import re
 import json
 import shutil
-import fitz  # PyMuPDF
+
+# Ensure UTF-8 stdout/stderr on Windows to avoid UnicodeEncodeError in cp1252
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+# PyMuPDF import with fallback to avoid deprecation warning
+try:
+    import pymupdf as fitz
+except ImportError:
+    import fitz
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
@@ -81,9 +94,9 @@ def _load_config():
             for k in defaults:
                 if k in user_cfg:
                     defaults[k] = user_cfg[k]
-            print(f"  📁 Loaded config from {config_path}")
+            print(f"  [CONFIG] Loaded config from {config_path}")
         except Exception as e:
-            print(f"  ⚠️  Could not load config.json: {e}")
+            print(f"  [WARN] Could not load config.json: {e}")
     return defaults
 
 _cfg = _load_config()
@@ -272,17 +285,17 @@ def extract_paper_data(pdf_path):
     """
     filename = os.path.basename(pdf_path)
     print(f"\n{'='*60}")
-    print(f"📄 Processing: {filename}")
+    print(f"[PROCESS] Processing: {filename}")
     print(f"{'='*60}")
 
     try:
         doc = fitz.open(pdf_path)
     except Exception as e:
-        print(f"  ❌ FATAL: Cannot open PDF — {e}")
+        print(f"  [ERROR] FATAL: Cannot open PDF -- {e}")
         return None
 
     if len(doc) == 0:
-        print(f"  ❌ FATAL: PDF has no pages")
+        print(f"  [ERROR] FATAL: PDF has no pages")
         doc.close()
         return None
 
@@ -327,7 +340,7 @@ def extract_paper_data(pdf_path):
                 s['is_super'] = True
 
     if not spans:
-        print(f"  ❌ FATAL: No text found on first page")
+        print(f"  [ERROR] FATAL: No text found on first page")
         return None
 
     # ════════════════════════════════════════════════
@@ -335,7 +348,7 @@ def extract_paper_data(pdf_path):
     # ════════════════════════════════════════════════
     sizes = [s['size'] for s in spans if s['text'].strip()]
     if not sizes:
-        print(f"  ❌ FATAL: No non-empty text spans")
+        print(f"  [ERROR] FATAL: No non-empty text spans")
         return None
 
     max_size = max(sizes)
@@ -349,7 +362,7 @@ def extract_paper_data(pdf_path):
 
     title = ' '.join(title_parts)
     title = re.sub(r'\s+', ' ', title).strip()
-    print(f"  ✅ Title: \"{title}\"")
+    print(f"  [OK] Title: \"{title}\"")
 
     # ════════════════════════════════════════════════
     # STEP 2: FIND SECTION BOUNDARIES
@@ -366,7 +379,7 @@ def extract_paper_data(pdf_path):
                 break
 
     if abstract_idx is None:
-        print(f"  ⚠️  WARNING: 'Abstract' marker not found — trying fallback")
+        print(f"  [WARN] 'Abstract' marker not found -- trying fallback")
         # Fallback: look for any occurrence of "Abstract"
         for i in range(last_title_idx + 1, len(spans)):
             if 'abstract' in spans[i]['text'].lower():
@@ -453,9 +466,9 @@ def extract_paper_data(pdf_path):
     if authors:
         for a in authors:
             coll_display = a['college'][:55] + '...' if len(a['college']) > 55 else a['college']
-            print(f"  ✅ Author: {a['name']} → {coll_display}")
+            print(f"  [OK] Author: {a['name']} -> {coll_display}")
     else:
-        print(f"  ⚠️  WARNING: No authors found")
+        print(f"  [WARN] No authors found")
 
     # ════════════════════════════════════════════════
     # STEP 4: EXTRACT ABSTRACT
@@ -483,9 +496,9 @@ def extract_paper_data(pdf_path):
 
         abstract_text = ' '.join(parts)
         abstract_text = re.sub(r'\s+', ' ', abstract_text).strip()
-        print(f"  ✅ Abstract: {len(abstract_text)} characters")
+        print(f"  [OK] Abstract: {len(abstract_text)} characters")
     else:
-        print(f"  ⚠️  WARNING: No abstract found")
+        print(f"  [WARN] No abstract found")
 
     # ════════════════════════════════════════════════
     # STEP 5: EXTRACT KEYWORDS
@@ -542,9 +555,9 @@ def extract_paper_data(pdf_path):
         keywords_text = re.sub(r'\s+', ' ', keywords_text).strip()
         # Remove trailing period if present
         keywords_text = keywords_text.rstrip('.')
-        print(f"  ✅ Keywords: \"{keywords_text[:80]}{'...' if len(keywords_text) > 80 else ''}\"")
+        print(f"  [OK] Keywords: \"{keywords_text[:80]}{'...' if len(keywords_text) > 80 else ''}\"")
     else:
-        print(f"  ⚠️  WARNING: No keywords found")
+        print(f"  [WARN] No keywords found")
 
     # ════════════════════════════════════════════════
     # VALIDATION SUMMARY
@@ -560,9 +573,9 @@ def extract_paper_data(pdf_path):
         issues.append("missing keywords")
 
     if issues:
-        print(f"  ⚠️  ISSUES: {', '.join(issues)}")
+        print(f"  [WARN] ISSUES: {', '.join(issues)}")
     else:
-        print(f"  ✅ All fields extracted successfully")
+        print(f"  [OK] All fields extracted successfully")
 
     return {
         'title': title,
@@ -916,24 +929,24 @@ def generate_body_pdf(papers, output_path):
         heights.append(h)
 
     # Print height analysis
-    print("\n  📐 Height analysis (available per page: "
+    print("\n  [ANALYSIS] Height analysis (available per page: "
           f"{avail_height:.0f}pt):")
     for i, paper in enumerate(papers):
         pct = (heights[i] / avail_height) * 100
-        bar = "█" * int(pct / 5)
+        bar = "#" * int(pct / 5)
         print(f"    [{i}] {heights[i]:6.1f}pt ({pct:4.1f}%)  "
               f"{bar}  {paper['title'][:50]}...")
 
     # ── Step 2: Smart pairing ──
     page_groups = _pair_papers_by_height(papers, heights, avail_height)
 
-    print(f"\n  🔗 Smart pairing result ({len(page_groups)} pages):")
+    print(f"\n  [PAIRING] Smart pairing result ({len(page_groups)} pages):")
     for pg_num, group in enumerate(page_groups):
         titles = [papers[idx]['title'][:45] + '...' for idx in group]
         total_h = sum(heights[idx] for idx in group)
         usage = (total_h / avail_height) * 100
         print(f"    Page {pg_num+1}: {len(group)} paper(s), "
-              f"{usage:.0f}% filled — {', '.join(titles)}")
+              f"{usage:.0f}% filled -- {', '.join(titles)}")
 
     # ── Step 3: Build flowable elements in paired order ──
     elements = []
@@ -1743,7 +1756,7 @@ def generate_word_output(papers, page_map, output_path):
         from docx.shared import Pt, Inches, RGBColor
         from docx.enum.text import WD_ALIGN_PARAGRAPH
     except ImportError:
-        print("  ❌ python-docx not installed. Run: pip3 install python-docx")
+        print("  [ERROR] python-docx not installed. Run: pip install python-docx")
         return False
 
     doc = Document()
@@ -2026,9 +2039,9 @@ def main():
 
     os.makedirs(output_folder, exist_ok=True)
 
-    print("╔══════════════════════════════════════════════════╗")
-    print("║       PDF SCRAPER & COMPILER                    ║")
-    print("╚══════════════════════════════════════════════════╝")
+    print("==================================================")
+    print("       ACROSET PDF SCRAPER & COMPILER             ")
+    print("==================================================")
     print(f"  Input folder:  {input_folder}/")
     print(f"  Output folder: {output_folder}/")
 
@@ -2039,10 +2052,10 @@ def main():
     ])
 
     if not pdf_files:
-        print(f"\n❌ No PDF files found in '{input_folder}/'")
+        print(f"\n[ERROR] No PDF files found in '{input_folder}/'")
         sys.exit(1)
 
-    print(f"\n📂 Found {len(pdf_files)} PDF(s): {', '.join(pdf_files)}")
+    print(f"\n[QUEUE] Found {len(pdf_files)} PDF(s): {', '.join(pdf_files)}")
 
     # ── Extract data from each PDF ──
     papers = []
@@ -2057,23 +2070,23 @@ def main():
             else:
                 failed.append(pdf_file)
         except Exception as e:
-            print(f"\n  ❌ EXCEPTION processing {pdf_file}: {e}")
+            print(f"\n  [ERROR] EXCEPTION processing {pdf_file}: {e}")
             failed.append(pdf_file)
 
     if not papers:
-        print("\n❌ No papers could be extracted! Check the PDFs.")
+        print("\n[ERROR] No papers could be extracted! Check the PDFs.")
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"📊 EXTRACTION SUMMARY")
+    print(f"[SUMMARY] EXTRACTION SUMMARY")
     print(f"{'='*60}")
-    print(f"  ✅ Successful: {len(papers)}")
+    print(f"  [OK] Successful: {len(papers)}")
     if failed:
-        print(f"  ❌ Failed:     {len(failed)} — {', '.join(failed)}")
+        print(f"  [ERROR] Failed:     {len(failed)} -- {', '.join(failed)}")
 
     # ── Generate body PDF (always needed for page_map) ──
     body_temp = os.path.join(output_folder, "_body_temp.pdf")
-    print(f"\n📝 Generating body pages...")
+    print(f"\n[PROCESS] Generating body pages...")
     page_map = generate_body_pdf(papers, body_temp)
 
     print(f"\n  Page assignments:")
@@ -2084,13 +2097,13 @@ def main():
     if output_format == 'word':
         # ── Word output ──
         output_path = os.path.join(output_folder, "compiled_output.docx")
-        print(f"\n📝 Generating Word document → {output_path}")
+        print(f"\n[PROCESS] Generating Word document -> {output_path}")
         success = generate_word_output(papers, page_map, output_path)
         # Cleanup temp body PDF
         if os.path.exists(body_temp):
             os.remove(body_temp)
         if not success:
-            print("\n❌ Word generation failed!")
+            print("\n[ERROR] Word generation failed!")
             sys.exit(1)
     else:
         # ── PDF output ──
@@ -2098,26 +2111,25 @@ def main():
         cover_temp = os.path.join(output_folder, "_cover_temp.pdf")
         has_cover = generate_cover_page_pdf(cover_temp)
         if has_cover:
-            print(f"\n📚 Generated cover page")
+            print(f"\n[PROCESS] Generated cover page")
         else:
             cover_temp = None
 
         invited_talks_temp = os.path.join(output_folder, "_invited_talks_temp.pdf")
         has_invited_talks = generate_invited_talks_pdf(invited_talks_temp)
         if has_invited_talks:
-            print(f"\n🗣️ Generated invited talks")
+            print(f"\n[PROCESS] Generated invited talks")
         else:
             invited_talks_temp = None
 
-
         toc_temp = os.path.join(output_folder, "_toc_temp.pdf")
-        print(f"\n📋 Generating Table of Contents...")
+        print(f"\n[PROCESS] Generating Table of Contents...")
         generate_toc_pdf(papers, page_map, toc_temp)
 
         output_path = os.path.join(output_folder, "compiled_output.pdf")
         parts_msg = " Cover +" if has_cover else ""
         parts_msg += " Invited Talks +" if has_invited_talks else ""
-        print(f"\n📎 Merging{parts_msg} TOC + Body → {output_path}")
+        print(f"\n[PROCESS] Merging{parts_msg} TOC + Body -> {output_path}")
         merge_pdfs(toc_temp, body_temp, output_path)
 
         # Cleanup temp files
@@ -2125,7 +2137,7 @@ def main():
         os.remove(toc_temp)
 
     # ── Move processed PDFs to output folder ──
-    print(f"\n📦 Moving processed PDFs to {output_folder}/...")
+    print(f"\n[PROCESS] Moving processed PDFs to {output_folder}/...")
     for pdf_file in pdf_files:
         src = os.path.join(input_folder, pdf_file)
         dst = os.path.join(output_folder, pdf_file)
@@ -2133,12 +2145,12 @@ def main():
             if os.path.exists(dst):
                 os.remove(dst)  # Remove if already exists
             shutil.move(src, dst)
-            print(f"    ✔ {pdf_file}")
+            print(f"    [OK] {pdf_file}")
 
     # ── Final summary ──
     if output_format == 'word':
         print(f"\n{'='*60}")
-        print(f"🎉 DONE!")
+        print(f"[DONE] COMPILATION COMPLETE")
         print(f"{'='*60}")
         print(f"  Output:      {output_path}")
         print(f"  Papers:      {len(papers)}")
@@ -2153,7 +2165,7 @@ def main():
         toc_pages = total_pages - body_page_count
 
         print(f"\n{'='*60}")
-        print(f"🎉 DONE!")
+        print(f"[DONE] COMPILATION COMPLETE")
         print(f"{'='*60}")
         print(f"  Output:      {output_path}")
         print(f"  Papers:      {len(papers)}")

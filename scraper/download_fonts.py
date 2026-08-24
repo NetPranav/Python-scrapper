@@ -1,6 +1,15 @@
 import os
+import sys
 import urllib.request
 import urllib.error
+
+# Ensure UTF-8 stdout/stderr on Windows to avoid UnicodeEncodeError in cp1252
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 # mapping of Font Name to GitHub raw URL for the TTF
 FONTS = {
