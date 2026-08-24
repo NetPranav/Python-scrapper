@@ -1,34 +1,63 @@
 @echo off
+setlocal enabledelayedexpansion
+
 echo ========================================================
-echo PDF Scraper - One-Click Setup ^& Run
+echo   ACROSET Paper Compiler - Complete One-Time Setup
 echo ========================================================
 echo.
 
-:: 1. Check Python
-echo [1/3] Checking Python and installing dependencies...
+:: Set current directory to the folder where setup.bat is located
+cd /d "%~dp0"
+
+:: 1. Create Required Directory Structure
+echo [1/4] Setting up project folders...
+if not exist "scraper\IncompletePDF" (
+    mkdir "scraper\IncompletePDF"
+    echo   + Created scraper\IncompletePDF
+)
+if not exist "scraper\CompletedPDF" (
+    mkdir "scraper\CompletedPDF"
+    echo   + Created scraper\CompletedPDF
+)
+if not exist "scraper\fonts" (
+    mkdir "scraper\fonts"
+    echo   + Created scraper\fonts
+)
+echo [OK] Directory structure verified!
+echo.
+
+:: 2. Check Python & Install Dependencies
+echo [2/4] Checking Python environment and packages...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Python is not installed or not added to your system PATH.
-    echo Please install Python from https://www.python.org/downloads/
+    echo [ERROR] Python is not installed or not in your system PATH.
+    echo Please install Python 3.10+ from https://www.python.org/downloads/
+    echo Make sure to check "Add Python to PATH" during installation.
     pause
     exit /b 1
 )
 
 python -m pip install --upgrade pip >nul 2>&1
-python -m pip install PyMuPDF reportlab
+python -m pip install PyMuPDF reportlab python-docx
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install Python dependencies.
     pause
     exit /b %errorlevel%
 )
-echo [OK] Python dependencies installed!
+
+:: Download fonts if download_fonts.py exists
+if exist "scraper\download_fonts.py" (
+    echo Downloading required academic fonts...
+    python "scraper\download_fonts.py" >nul 2>&1
+)
+echo [OK] Python dependencies and fonts installed!
 echo.
 
-:: 2. Check Node.js and Install NPM Packages
-echo [2/3] Checking Node.js and installing NPM packages...
+:: 3. Check Node.js & Install NPM Dependencies
+echo [3/4] Checking Node.js and installing web dependencies...
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Node.js is not installed or not added to your system PATH.
+    echo [ERROR] Node.js is not installed or not in your system PATH.
     echo Please install Node.js from https://nodejs.org/
     pause
     exit /b 1
@@ -36,23 +65,28 @@ if %errorlevel% neq 0 (
 
 call npm install
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to install Node.js dependencies.
+    echo [ERROR] Failed to install Node.js npm dependencies.
     pause
     exit /b %errorlevel%
 )
 echo [OK] Node.js dependencies installed!
 echo.
 
-:: 3. Run the Next.js Server
-echo [3/3] Starting the Server...
-echo The application should automatically open in your default browser.
-echo If it doesn't, please go to http://localhost:3000 manually.
+:: 4. Completion Summary
+echo ========================================================
+echo   [SUCCESS] Setup Completed Successfully!
+echo ========================================================
 echo.
-echo Press Ctrl+C in this window to stop the server when you are done.
+echo You can now run the application anytime using:
+echo   run.bat (or double click your desktop shortcut)
 echo.
+echo Would you like to start the application now? (Y/N)
+set /p START_NOW="Choice: "
 
-timeout /t 3 /nobreak >nul
-start http://localhost:3000
-call npm run dev
+if /i "%START_NOW%"=="Y" (
+    echo.
+    echo Starting application...
+    start "" "run.bat"
+)
 
-pause
+exit /b 0
