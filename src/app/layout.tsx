@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-
 export const metadata: Metadata = {
-  title: "PDF Scraper — ACROSET Conference Tools",
-  description: "Scrape, compile, and generate conference paper compilations from PDF documents.",
+  title: "ACROSET — Conference Paper Compilation Studio",
+  description: "Academic paper compiler, typesetter, and PDF/Word generator for conference proceedings.",
 };
 
 export default function RootLayout({
@@ -15,13 +14,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link href="https://fonts.googleapis.com/css2?family=Amatic+SC&family=Bangers&family=Bebas+Neue&family=Black+Ops+One&family=Caveat&family=Cinzel&family=Creepster&family=Dancing+Script&family=Lobster&family=Montserrat&family=Orbitron&family=Oswald&family=Pacifico&family=Permanent+Marker&family=Righteous&family=Russo+One&display=swap" rel="stylesheet" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body>
-        <div className="dashboard-layout">
-          <main className="main-content">
-            {children}
-          </main>
+      <body className="antialiased">
+        <div className="app-container">
+          {children}
         </div>
       </body>
     </html>
