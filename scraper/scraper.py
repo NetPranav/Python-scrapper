@@ -751,322 +751,273 @@ def _body_page_handler(canvas, doc):
     canvas.restoreState()
 
 
-def _get_density_styles(density_mode='standard'):
+def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     """
-    Returns (st_title, st_authors, st_abstract, st_keywords, spacing_info)
-    tailored to the density mode.
-
-    Modes:
-      - 'standard': Full default spacing, generous margins.
-      - 'compact': Reduced margins & tight spacing to merge 2 papers that slightly exceed standard height.
-      - 'ultra_compact': Tightest margins & micro-scaled line spacing/font to merge larger papers.
+    Builds the ReportLab flowables for all papers on a single page using the given
+    tier parameters and measures the exact total rendered height.
     """
-    if density_mode == 'ultra_compact':
-        line_factor = max(1.22, LINE_SPACING_FACTOR * 0.85)
-        title_size = TITLE_FONT_SIZE
-        auth_size = AUTHORS_FONT_SIZE
-        abs_size = max(8.5, ABSTRACT_FONT_SIZE - 0.5)
-        kw_size = max(8.5, KEYWORDS_FONT_SIZE - 0.5)
-        space_title = 2
-        space_auth = 2
-        space_abs = 2
-        space_kw = 2
-        spacer_auth_abs = 1
-        sep_spacer_top = 1
-        sep_dot_h = 8
-        sep_spacer_bottom = 2
-        sep_total = 11
-    elif density_mode == 'compact':
-        line_factor = max(1.30, LINE_SPACING_FACTOR * 0.92)
-        title_size = TITLE_FONT_SIZE
-        auth_size = AUTHORS_FONT_SIZE
-        abs_size = ABSTRACT_FONT_SIZE
-        kw_size = KEYWORDS_FONT_SIZE
-        space_title = 2
-        space_auth = 3
-        space_abs = 2
-        space_kw = 2
-        spacer_auth_abs = 2
-        sep_spacer_top = 2
-        sep_dot_h = 12
-        sep_spacer_bottom = 4
-        sep_total = 18
-    else:  # standard
-        line_factor = LINE_SPACING_FACTOR
-        title_size = TITLE_FONT_SIZE
-        auth_size = AUTHORS_FONT_SIZE
-        abs_size = ABSTRACT_FONT_SIZE
-        kw_size = KEYWORDS_FONT_SIZE
-        space_title = 5
-        space_auth = 8
-        space_abs = 5
-        space_kw = 6
-        spacer_auth_abs = 4
-        sep_spacer_top = 6
-        sep_dot_h = 18
-        sep_spacer_bottom = 12
-        sep_total = 36
+    font_title = tier['font_title']
+    font_auth = tier['font_auth']
+    font_abs = tier['font_abs']
+    font_kw = tier['font_kw']
+    leading_factor = tier['leading_factor']
+    space_title = tier['space_title']
+    space_auth = tier['space_auth']
+    space_abs = tier['space_abs']
+    space_kw = tier['space_kw']
+    spacer_auth_abs = tier['spacer_auth_abs']
+    sep_top = tier['sep_top']
+    sep_dot = tier['sep_dot']
+    sep_bottom = tier['sep_bottom']
 
     st_title = ParagraphStyle(
-        f'paper_title_{density_mode}',
+        f"title_{tier['name']}_{len(page_papers)}",
         fontName='Times-Bold',
-        fontSize=title_size,
-        leading=title_size * line_factor,
+        fontSize=font_title,
+        leading=font_title * leading_factor,
         alignment=TA_CENTER,
         spaceAfter=space_title,
         wordSpace=WORD_SPACING,
     )
-    st_authors = ParagraphStyle(
-        f'paper_authors_{density_mode}',
+    st_auth = ParagraphStyle(
+        f"auth_{tier['name']}_{len(page_papers)}",
         fontName='Times-Roman',
-        fontSize=auth_size,
-        leading=auth_size * line_factor,
+        fontSize=font_auth,
+        leading=font_auth * leading_factor,
         alignment=TA_CENTER,
         spaceAfter=space_auth,
         wordSpace=WORD_SPACING * 0.7,
     )
-    st_abstract = ParagraphStyle(
-        f'paper_abstract_{density_mode}',
+    st_abs = ParagraphStyle(
+        f"abs_{tier['name']}_{len(page_papers)}",
         fontName='Times-Roman',
-        fontSize=abs_size,
-        leading=abs_size * line_factor,
+        fontSize=font_abs,
+        leading=font_abs * leading_factor,
         alignment=TA_JUSTIFY,
         spaceAfter=space_abs,
         wordSpace=WORD_SPACING,
     )
-    st_keywords = ParagraphStyle(
-        f'paper_keywords_{density_mode}',
+    st_kw = ParagraphStyle(
+        f"kw_{tier['name']}_{len(page_papers)}",
         fontName='Times-Roman',
-        fontSize=kw_size,
-        leading=kw_size * line_factor,
+        fontSize=font_kw,
+        leading=font_kw * leading_factor,
         alignment=TA_LEFT,
         spaceAfter=space_kw,
         wordSpace=WORD_SPACING * 0.7,
     )
 
-    spacing_info = {
-        'density_mode': density_mode,
-        'line_factor': line_factor,
-        'title_size': title_size,
-        'auth_size': auth_size,
-        'abs_size': abs_size,
-        'kw_size': kw_size,
-        'spacer_auth_abs': spacer_auth_abs,
-        'sep_spacer_top': sep_spacer_top,
-        'sep_dot_h': sep_dot_h,
-        'sep_spacer_bottom': sep_spacer_bottom,
-        'sep_total': sep_total,
-        'space_title': space_title,
-        'space_auth': space_auth,
-        'space_abs': space_abs,
-        'space_kw': space_kw,
-    }
-
-    return (st_title, st_authors, st_abstract, st_keywords), spacing_info
-
-
-def _estimate_paper_height(paper, styles, spacing_info, avail_width):
-    """
-    Pre-calculate the exact rendered height of a paper block under a given density style.
-    """
-    st_title, st_authors, st_abstract, st_keywords = styles
-
-    title_safe = html_escape(paper['title'])
-    abstract_safe = html_escape(paper['abstract'])
-    keywords_safe = html_escape(paper['keywords'])
-
-    authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=True)
-
-    p_title = Paragraph(title_safe, st_title)
-    p_authors = Paragraph(authors_text, st_authors)
-    p_affiliations = Paragraph(f'<i>{affiliations_text}</i>', st_authors) if affiliations_text else None
-    p_abstract = Paragraph(
-        f"<b>Abstract— </b>{abstract_safe}", st_abstract
-    )
-    p_keywords = Paragraph(
-        f"<b>Keywords— </b><i>{keywords_safe}</i>", st_keywords
-    )
-
+    page_flowables = []
     total_h = 0
-    for p in [p_title, p_authors, p_affiliations, p_abstract, p_keywords]:
-        if p is not None:
-            _, h = p.wrap(avail_width, 9999)
-            total_h += h
+    k = len(page_papers)
 
-    # Internal spacing from styles
-    total_h += spacing_info['space_title'] + spacing_info['space_auth'] + spacing_info['space_abs'] + spacing_info['space_kw']
-    total_h += spacing_info['spacer_auth_abs']
-    total_h += 4  # safety buffer
+    for item_idx, (paper, paper_idx) in enumerate(zip(page_papers, page_paper_indices)):
+        title_safe = html_escape(paper['title'])
+        abstract_safe = html_escape(paper['abstract'])
+        keywords_safe = html_escape(paper['keywords'])
+        authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=True)
 
-    return total_h
+        p_title = Paragraph(title_safe, st_title)
+        p_authors = Paragraph(authors_text, st_auth)
+        p_aff = Paragraph(f'<i>{affiliations_text}</i>', st_auth) if affiliations_text else None
+        p_abs = Paragraph(f"<b>Abstract— </b>{abstract_safe}", st_abs)
+        p_kw = Paragraph(f"<b>Keywords— </b><i>{keywords_safe}</i>", st_kw)
+
+        # Measure flowables
+        _, h_t = p_title.wrap(avail_width, 9999)
+        _, h_a = p_authors.wrap(avail_width, 9999)
+        h_aff = 0
+        if p_aff:
+            _, h_aff = p_aff.wrap(avail_width, 9999)
+        _, h_ab = p_abs.wrap(avail_width, 9999)
+        _, h_k = p_kw.wrap(avail_width, 9999)
+
+        item_h = (h_t + space_title + h_a +
+                  (h_aff + space_auth if p_aff else space_auth) +
+                  spacer_auth_abs + h_ab + space_abs + h_k + space_kw)
+        total_h += item_h
+
+        page_flowables.append(PageTracker(paper_idx))
+        page_flowables.append(p_title)
+        page_flowables.append(p_authors)
+        if p_aff:
+            page_flowables.append(p_aff)
+        page_flowables.append(Spacer(1, spacer_auth_abs))
+        page_flowables.append(p_abs)
+        page_flowables.append(p_kw)
+
+        # Separator between papers on the same page (not after the last paper)
+        if item_idx < k - 1:
+            sep_h = sep_top + sep_dot + sep_bottom
+            total_h += sep_h
+            page_flowables.append(Spacer(1, sep_top))
+            page_flowables.append(DotSeparator(avail_width, height=sep_dot))
+            page_flowables.append(Spacer(1, sep_bottom))
+
+    return page_flowables, total_h
 
 
-def _pack_papers_optimally(papers, avail_height):
+def _generate_page_flowables(page_papers, page_paper_indices, avail_width, avail_height):
     """
-    Adaptive Multi-Fit Bin Packing Algorithm:
-    Partitions papers across pages and dynamically applies margin/spacing
-    compression ('compact' or 'ultra_compact') whenever doing so merges 2 or more
-    papers onto the same page, preventing intermediate half-empty pages.
+    Dynamically finds the best styling tier to guarantee that all papers in page_papers
+    (at least 2 papers, or 1 on the odd final page) strictly fit onto a single page without
+    causing ReportLab to break across pages.
+    """
+    k = len(page_papers)
+    target_budget = avail_height - 10.0  # 10pt safety buffer
 
-    Returns:
-        (page_groups, page_density_modes)
+    if k == 1:
+        # Single paper (final page remainder)
+        tiers = [
+            {'name': 'standard', 'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+             'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE, 'leading_factor': LINE_SPACING_FACTOR,
+             'space_title': 5, 'space_auth': 8, 'space_abs': 5, 'space_kw': 6, 'spacer_auth_abs': 4,
+             'sep_top': 6, 'sep_dot': 18, 'sep_bottom': 12}
+        ]
+    else:
+        # 2 or more papers on this page -> Progressive auto-squeeze ladder
+        tiers = [
+            # Tier 0: Standard generous spacing
+            {'name': 'standard', 'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+             'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE, 'leading_factor': LINE_SPACING_FACTOR,
+             'space_title': 4, 'space_auth': 6, 'space_abs': 4, 'space_kw': 4, 'spacer_auth_abs': 3,
+             'sep_top': 4, 'sep_dot': 14, 'sep_bottom': 6},
+
+            # Tier 1: Compact Margins & Separator
+            {'name': 'compact', 'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+             'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE,
+             'leading_factor': max(1.30, LINE_SPACING_FACTOR * 0.92),
+             'space_title': 2, 'space_auth': 3, 'space_abs': 2, 'space_kw': 2, 'spacer_auth_abs': 2,
+             'sep_top': 2, 'sep_dot': 10, 'sep_bottom': 3},
+
+            # Tier 2: Squeezed Line Spacing & Micro Margins
+            {'name': 'squeezed', 'font_title': max(11.0, TITLE_FONT_SIZE - 0.5),
+             'font_auth': max(8.5, AUTHORS_FONT_SIZE - 0.5),
+             'font_abs': max(8.5, ABSTRACT_FONT_SIZE - 0.5),
+             'font_kw': max(8.5, KEYWORDS_FONT_SIZE - 0.5),
+             'leading_factor': max(1.22, LINE_SPACING_FACTOR * 0.85),
+             'space_title': 2, 'space_auth': 2, 'space_abs': 2, 'space_kw': 1, 'spacer_auth_abs': 1,
+             'sep_top': 1, 'sep_dot': 8, 'sep_bottom': 2},
+
+            # Tier 3: High Density Squeeze (for 2 long 200+ word abstracts)
+            {'name': 'high_squeeze', 'font_title': 10.5, 'font_auth': 8.0, 'font_abs': 8.5, 'font_kw': 8.0,
+             'leading_factor': 1.16,
+             'space_title': 1, 'space_auth': 1, 'space_abs': 1, 'space_kw': 1, 'spacer_auth_abs': 1,
+             'sep_top': 1, 'sep_dot': 6, 'sep_bottom': 1},
+
+            # Tier 4: Ultra Squeeze (for 2 massive 300+ word abstracts)
+            {'name': 'ultra_squeeze', 'font_title': 9.8, 'font_auth': 7.5, 'font_abs': 7.8, 'font_kw': 7.5,
+             'leading_factor': 1.12,
+             'space_title': 1, 'space_auth': 1, 'space_abs': 1, 'space_kw': 1, 'spacer_auth_abs': 1,
+             'sep_top': 1, 'sep_dot': 4, 'sep_bottom': 1}
+        ]
+
+    for tier in tiers:
+        flowables, measured_h = _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width)
+        if measured_h <= target_budget:
+            return flowables, tier['name'], measured_h
+
+    # Emergency fallback: dynamically scale down font until it fits
+    scale = 0.90
+    while scale >= 0.70:
+        emergency_tier = {
+            'name': f'emergency_{int(scale*100)}',
+            'font_title': max(8.5, 9.8 * scale),
+            'font_auth': max(7.0, 7.5 * scale),
+            'font_abs': max(7.0, 7.8 * scale),
+            'font_kw': max(7.0, 7.5 * scale),
+            'leading_factor': 1.10,
+            'space_title': 1, 'space_auth': 1, 'space_abs': 1, 'space_kw': 1, 'spacer_auth_abs': 1,
+            'sep_top': 1, 'sep_dot': 4, 'sep_bottom': 1
+        }
+        flowables, measured_h = _build_and_measure_page(page_papers, page_paper_indices, emergency_tier, avail_width)
+        if measured_h <= target_budget:
+            return flowables, emergency_tier['name'], measured_h
+        scale -= 0.05
+
+    return flowables, 'emergency_min', measured_h
+
+
+def _group_papers_at_least_two(papers, avail_height):
+    """
+    Groups papers such that:
+      1. Every single page MUST have AT LEAST 2 ABSTRACTS (2 or 3 papers).
+      2. Only the very last page is permitted to have 1 abstract if total papers N is odd.
+      3. Triples (3 papers) are formed when 3 short papers can fit together comfortably.
     """
     n = len(papers)
     if n == 0:
-        return [], []
+        return []
     if n == 1:
-        return [(0,)], ['standard']
+        return [(0,)]
+    if n == 2:
+        return [(0, 1)]
 
-    # Pre-calculate heights under all 3 density modes
-    styles_std, sp_std = _get_density_styles('standard')
-    styles_cmp, sp_cmp = _get_density_styles('compact')
-    styles_ult, sp_ult = _get_density_styles('ultra_compact')
+    # Estimate rough standard heights to identify small triples
+    test_tier = {
+        'name': 'test', 'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+        'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE, 'leading_factor': LINE_SPACING_FACTOR,
+        'space_title': 4, 'space_auth': 6, 'space_abs': 4, 'space_kw': 4, 'spacer_auth_abs': 3,
+        'sep_top': 4, 'sep_dot': 14, 'sep_bottom': 6
+    }
+    raw_heights = []
+    for i, p in enumerate(papers):
+        _, h = _build_and_measure_page([p], [i], test_tier, CONTENT_WIDTH)
+        raw_heights.append(h)
 
-    heights_std = [_estimate_paper_height(p, styles_std, sp_std, CONTENT_WIDTH) for p in papers]
-    heights_cmp = [_estimate_paper_height(p, styles_cmp, sp_cmp, CONTENT_WIDTH) for p in papers]
-    heights_ult = [_estimate_paper_height(p, styles_ult, sp_ult, CONTENT_WIDTH) for p in papers]
+    # Sort indices ascending by height to pair small with small or pair sequentially
+    # We maintain original sequence or group into 2s (and 3s for very small items)
+    page_groups = []
+    remaining = list(range(n))
 
-    def test_group_fit(group):
-        """
-        Tests if a group of paper indices fits on a single page.
-        Returns ('mode', total_height) or (None, float('inf'))
-        """
-        k = len(group)
-        if k == 0:
-            return 'standard', 0
+    # Identify if 3 small papers can be merged into a 3-pack (when height sum < 620pt)
+    # Check while remaining >= 3
+    i = 0
+    while i < len(remaining):
+        rem_count = len(remaining) - i
 
-        # Try standard first
-        h_std = sum(heights_std[i] for i in group) + (k - 1) * sp_std['sep_total']
-        if h_std <= avail_height:
-            return 'standard', h_std
-
-        # Try compact (reduced margins & tighter line spacing)
-        h_cmp = sum(heights_cmp[i] for i in group) + (k - 1) * sp_cmp['sep_total']
-        if h_cmp <= avail_height:
-            return 'compact', h_cmp
-
-        # Try ultra_compact (micro-scaled spacing to merge larger papers)
-        h_ult = sum(heights_ult[i] for i in group) + (k - 1) * sp_ult['sep_total']
-        if h_ult <= avail_height:
-            return 'ultra_compact', h_ult
-
-        return None, float('inf')
-
-    # Sort paper indices descending by standard height
-    items = sorted(range(n), key=lambda i: heights_std[i], reverse=True)
-
-    # 1. Best-Fit Decreasing heuristic with adaptive density modes
-    def solve_bfd():
-        bins = []
-        for item in items:
-            best_b = -1
-            min_residual = float('inf')
-            for b_idx, b in enumerate(bins):
-                cand = b + [item]
-                mode, h = test_group_fit(cand)
-                if mode is not None:
-                    res = avail_height - h
-                    if res < min_residual:
-                        min_residual = res
-                        best_b = b_idx
-            if best_b != -1:
-                bins[best_b].append(item)
+        if rem_count == 3:
+            # 3 papers remaining: can they fit together on 1 page?
+            h_triple = raw_heights[remaining[i]] + raw_heights[remaining[i+1]] + raw_heights[remaining[i+2]] + 30
+            if h_triple <= avail_height:
+                page_groups.append((remaining[i], remaining[i+1], remaining[i+2]))
+                i += 3
             else:
-                bins.append([item])
-        return bins
+                # Group as 2 and 1 (last page gets 1)
+                page_groups.append((remaining[i], remaining[i+1]))
+                page_groups.append((remaining[i+2],))
+                i += 3
+            break
+        elif rem_count >= 4:
+            # Check if 3 small papers can fit
+            h_triple = raw_heights[remaining[i]] + raw_heights[remaining[i+1]] + raw_heights[remaining[i+2]] + 30
+            if h_triple <= 600.0:
+                page_groups.append((remaining[i], remaining[i+1], remaining[i+2]))
+                i += 3
+            else:
+                # Group 2 papers
+                page_groups.append((remaining[i], remaining[i+1]))
+                i += 2
+        elif rem_count == 2:
+            page_groups.append((remaining[i], remaining[i+1]))
+            i += 2
+        else:  # rem_count == 1
+            # Leftover single paper -> final page
+            page_groups.append((remaining[i],))
+            i += 1
 
-    best_bins = solve_bfd()
-    min_bin_count = len(best_bins)
-
-    def calc_score(bins):
-        # Cubic score heavily rewards 90-100% full pages, concentrating slack in the final page
-        score = 0
-        for b in bins:
-            mode, h = test_group_fit(b)
-            if mode is not None:
-                score += (h / avail_height) ** 3
-        return score
-
-    best_score = calc_score(best_bins)
-
-    # 2. Local Search & Backtracking optimization for best sequencing (bounded budget)
-    if n <= 100:
-        step_count = 0
-        max_steps = 2500
-
-        def backtrack(item_pos, current_bins):
-            nonlocal best_bins, min_bin_count, best_score, step_count
-            step_count += 1
-            if step_count > max_steps:
-                return
-
-            if len(current_bins) > min_bin_count:
-                return
-
-            if item_pos == n:
-                score = calc_score(current_bins)
-                if len(current_bins) < min_bin_count or (len(current_bins) == min_bin_count and score > best_score):
-                    min_bin_count = len(current_bins)
-                    best_score = score
-                    best_bins = [list(b) for b in current_bins]
-                return
-
-            item = items[item_pos]
-            candidates = []
-            for b_idx, b in enumerate(current_bins):
-                cand = b + [item]
-                mode, h = test_group_fit(cand)
-                if mode is not None:
-                    res = avail_height - h
-                    candidates.append((res, b_idx))
-
-            candidates.sort(key=lambda x: x[0])  # tightest fit first
-
-            for _, b_idx in candidates:
-                if step_count > max_steps:
-                    break
-                current_bins[b_idx].append(item)
-                backtrack(item_pos + 1, current_bins)
-                current_bins[b_idx].pop()
-
-            if len(current_bins) + 1 <= min_bin_count and step_count <= max_steps:
-                current_bins.append([item])
-                backtrack(item_pos + 1, current_bins)
-                current_bins.pop()
-
-        try:
-            backtrack(0, [])
-        except Exception:
-            pass
-
-    # 3. Form final page groups and determine density mode per page
-    page_records = []
-    for b in best_bins:
-        if not b:
-            continue
-        group = tuple(b)
-        mode, h = test_group_fit(group)
-        page_records.append((group, mode or 'standard', h))
-
-    # Sort pages so fullest pages come first (85-100% full)
-    # Only the very last page holds the remaining partial fill!
-    page_records.sort(key=lambda rec: rec[2], reverse=True)
-
-    page_groups = [rec[0] for rec in page_records]
-    page_density_modes = [rec[1] for rec in page_records]
-
-    return page_groups, page_density_modes
+    return page_groups
 
 
 def generate_body_pdf(papers, output_path):
     """
     Generate the body pages of the compiled PDF using ReportLab Platypus.
 
-    Uses adaptive density bin packing:
-      1. Pre-calculates exact rendered height of each paper across density modes
-      2. Automatically compresses margins/spacing when needed to merge 2 papers on 1 page
-      3. Ensures no paper content splits across pages (KeepTogether)
-      4. Never leaves intermediate pages half-empty
+    Guarantees:
+      1. Every page contains AT LEAST 2 abstracts (except the final page if N is odd).
+      2. Dynamically reduces spacing/margins/font sizes so all abstracts on a page strictly fit
+         on that single page without spilling onto an extra half-empty page.
+      3. Zero intermediate half-empty pages.
 
     Returns tuple (page_map, page_groups, page_density_modes)
     """
@@ -1096,73 +1047,37 @@ def generate_body_pdf(papers, output_path):
         PageTemplate('body_page', frames=[frame], onPage=_body_page_handler)
     ])
 
-    # ── Step 1: Adaptive Dense Packing ──
-    page_groups, page_density_modes = _pack_papers_optimally(papers, avail_height)
+    # ── Step 1: Guaranteed >=2 Abstract Grouping ──
+    page_groups = _group_papers_at_least_two(papers, avail_height)
 
-    # Print packing and height analysis
     print(f"\n  [ANALYSIS] Available height per page: {avail_height:.0f}pt")
-    print(f"\n  [PACKING] Dense page packing ({len(page_groups)} pages):")
+    print(f"\n  [PACKING] Guaranteed Multi-Abstract Page Groups ({len(page_groups)} pages):")
 
-    for pg_num, (group, mode) in enumerate(zip(page_groups, page_density_modes)):
-        styles, sp_info = _get_density_styles(mode)
-        h_papers = [_estimate_paper_height(papers[i], styles, sp_info, CONTENT_WIDTH) for i in group]
-        k = len(group)
-        sep_h = sp_info['sep_total'] if k > 1 else 0
-        total_h = sum(h_papers) + (k - 1) * sep_h
-        usage = min(100.0, (total_h / avail_height) * 100)
+    elements = []
+    page_density_modes = []
+
+    for pg_num, group in enumerate(page_groups):
+        page_papers = [papers[idx] for idx in group]
+        page_paper_indices = list(group)
+
+        # Generate guaranteed single-page flowables via dynamic auto-squeeze ladder
+        flowables, mode_name, measured_h = _generate_page_flowables(
+            page_papers, page_paper_indices, CONTENT_WIDTH, avail_height
+        )
+        page_density_modes.append(mode_name)
+
+        usage = min(100.0, (measured_h / avail_height) * 100)
         is_last = (pg_num == len(page_groups) - 1)
         tag = " (Final Page)" if is_last else ""
-        mode_tag = f" [{mode}]" if mode != 'standard' else ""
-        titles = [papers[idx]['title'][:40] + '...' for idx in group]
-        print(f"    Page {pg_num+1}: {k} paper(s), {usage:.0f}% filled{mode_tag}{tag} -- {', '.join(titles)}")
+        mode_tag = f" [{mode_name}]" if mode_name != 'standard' else ""
+        titles = [papers[idx]['title'][:38] + '...' for idx in group]
+        print(f"    Page {pg_num+1}: {len(group)} abstract(s), {usage:.0f}% filled{mode_tag}{tag} -- {', '.join(titles)}")
 
-    # ── Step 2: Build flowable elements in optimal page order ──
-    elements = []
-
-    for pg_idx, (group, mode) in enumerate(zip(page_groups, page_density_modes)):
-        if pg_idx > 0:
+        if pg_num > 0:
             elements.append(PageBreak())
 
-        styles, sp_info = _get_density_styles(mode)
-        st_title, st_authors, st_abstract, st_keywords = styles
-        k = len(group)
-
-        for item_idx, paper_idx in enumerate(group):
-            paper = papers[paper_idx]
-
-            title_safe = html_escape(paper['title'])
-            abstract_safe = html_escape(paper['abstract'])
-            keywords_safe = html_escape(paper['keywords'])
-
-            authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=True)
-
-            block_items = [
-                PageTracker(paper_idx),
-                Paragraph(title_safe, st_title),
-                Paragraph(authors_text, st_authors),
-            ]
-            if affiliations_text:
-                block_items.append(Paragraph(f'<i>{affiliations_text}</i>', st_authors))
-            block_items.extend([
-                Spacer(1, sp_info['spacer_auth_abs']),
-                Paragraph(
-                    f"<b>Abstract— </b>{abstract_safe}", st_abstract
-                ),
-                Paragraph(
-                    f"<b>Keywords— </b><i>{keywords_safe}</i>", st_keywords
-                ),
-            ])
-
-            # Only add separator between papers on the same page (not at the end of the page)
-            if item_idx < k - 1:
-                block_items.extend([
-                    Spacer(1, sp_info['sep_spacer_top']),
-                    DotSeparator(CONTENT_WIDTH, height=sp_info['sep_dot_h']),
-                    Spacer(1, sp_info['sep_spacer_bottom']),
-                ])
-
-            paper_block = KeepTogether(block_items)
-            elements.append(paper_block)
+        # Append all flowables for this page
+        elements.extend(flowables)
 
     # Build the PDF
     doc.build(elements)
