@@ -919,9 +919,10 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     Combinatorial Re-Ordering & Bin Packing Optimization Engine:
     Shuffles and matches abstracts of complementary sizes (large + small, medium + medium,
     or small + small + small) across all available papers so that:
-      1. Every single page before the last page has BETWEEN 2 AND 4 ABSTRACTS and is packed to 85%-100% fullness.
-      2. Any remaining slack is concentrated strictly on the final page.
-      3. Total number of pages is minimized.
+      1. Every single page before the last page has BETWEEN 2 AND 3 ABSTRACTS and is packed to 80%-100% fullness.
+      2. No page ever has 4 abstracts, ensuring clean divider spacing and readable typography.
+      3. Any remaining slack is concentrated strictly on the final page.
+      4. Total number of pages is minimized while preserving generous margins.
     """
     n = len(papers)
     if n == 0:
@@ -938,7 +939,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
         k = len(grp)
         if k == 0:
             return True, 0.0, 0
-        if k > 4:  # Maximum 4 abstracts per page for clean, professional layout
+        if k > 3:  # Strictly maximum 3 abstracts per page (clean editorial layout)
             return False, float('inf'), None
         for t_idx, tier in enumerate(TIER_SPECS):
             h_papers = sum(height_matrix[i][t_idx] for i in grp)
@@ -951,13 +952,13 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     # Sort descending by standard height
     sorted_items = sorted(range(n), key=lambda i: height_matrix[i][0], reverse=True)
 
-    # 1. Best-Fit Decreasing
+    # 1. Best-Fit Decreasing (Max 3 items per bin)
     bins = []
     for item in sorted_items:
         best_b = -1
         min_slack = float('inf')
         for b_idx, b in enumerate(bins):
-            if len(b) >= 4:
+            if len(b) >= 3:
                 continue
             cand = b + [item]
             fits, tot, _ = test_group(cand)
@@ -971,7 +972,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
         else:
             bins.append([item])
 
-    # 2. Repair any single-item bins: pair singles together or merge into bins with <= 3 items
+    # 2. Repair any single-item bins: pair singles together or merge into bins with 2 items
     multi_bins = [b for b in bins if len(b) >= 2]
     single_bins = [b for b in bins if len(b) == 1]
     unmatched = []
@@ -979,7 +980,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
         item = s[0]
         placed = False
         for b in multi_bins:
-            if len(b) >= 4:
+            if len(b) >= 3:
                 continue
             cand = b + [item]
             fits, _, _ = test_group(cand)
@@ -1002,12 +1003,23 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     def score_partition(part):
         sc = 0.0
         for b in part:
-            fits, tot, _ = test_group(b)
+            fits, tot, t_idx = test_group(b)
             if fits:
                 ratio = min(1.0, tot / avail_height)
-                sc += (ratio ** 4) * 100.0
-                if len(b) >= 2:
-                    sc += 50.0
+                if ratio >= 0.78:
+                    sc += 200.0 + (ratio * 100.0)
+                else:
+                    sc += (ratio ** 2) * 80.0
+                # Bonus for 2 or 3 items (clean layout)
+                if len(b) in (2, 3):
+                    sc += 100.0
+                # Bonus for using standard generous margins
+                if t_idx == 0:
+                    sc += 60.0
+                elif t_idx == 1:
+                    sc += 30.0
+                elif t_idx == 3:
+                    sc -= 30.0  # penalize over-squeezing
         return sc
 
     best_bins = [list(b) for b in multi_bins]
@@ -1028,7 +1040,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
             c1 = list(b1)
             c2 = list(b2)
             c1[i1], c2[i2] = c2[i2], c1[i1]
-            if len(c1) <= 4 and len(c2) <= 4:
+            if len(c1) <= 3 and len(c2) <= 3:
                 f1, _, _ = test_group(c1)
                 f2, _, _ = test_group(c2)
                 if f1 and f2:
@@ -1042,8 +1054,8 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
                         curr_bins = cand_part
                         continue
 
-        # Try item transfer if b1 has >= 3 and b2 has <= 3
-        if len(b1) >= 3 and len(b2) <= 3:
+        # Try item transfer if b1 has 3 and b2 has <= 2
+        if len(b1) >= 3 and len(b2) <= 2:
             i1 = random.randrange(len(b1))
             c1 = [x for idx, x in enumerate(b1) if idx != i1]
             c2 = b2 + [b1[i1]]
