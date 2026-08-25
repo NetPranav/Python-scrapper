@@ -879,14 +879,15 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
                   spacer_auth_abs + h_ab + space_abs + h_k + space_kw)
         total_h += item_h
 
-        page_flowables.append(PageTracker(paper_idx))
-        page_flowables.append(p_title)
-        page_flowables.append(p_authors)
+        # Wrap this entire paper's components in an atomic KeepTogether block so ReportLab NEVER splits keywords or abstract across pages
+        paper_block = [PageTracker(paper_idx), p_title, p_authors]
         if p_aff:
-            page_flowables.append(p_aff)
-        page_flowables.append(Spacer(1, spacer_auth_abs))
-        page_flowables.append(p_abs)
-        page_flowables.append(p_kw)
+            paper_block.append(p_aff)
+        paper_block.append(Spacer(1, spacer_auth_abs))
+        paper_block.append(p_abs)
+        paper_block.append(p_kw)
+
+        page_flowables.append(KeepTogether(paper_block))
 
         # Separator between papers on the same page (not after the last paper)
         if item_idx < k - 1:
@@ -902,7 +903,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
 def _precompute_paper_heights(papers, avail_width):
     """
     Precomputes the rendered height matrix for all papers across all tiers.
-    Matrix shape: N x 5
+    Matrix shape: N x 4
     """
     matrix = []
     for p_idx, p in enumerate(papers):
@@ -917,12 +918,14 @@ def _precompute_paper_heights(papers, avail_width):
 def _find_optimal_zero_waste_packing(papers, avail_height):
     """
     Combinatorial Re-Ordering & Bin Packing Optimization Engine:
-    Shuffles and matches abstracts of complementary sizes (large + small, medium + medium,
-    or small + small + small) across all available papers so that:
-      1. Every single page before the last page has BETWEEN 2 AND 3 ABSTRACTS and is packed to 80%-100% fullness.
-      2. No page ever has 4 abstracts, ensuring clean divider spacing and readable typography.
-      3. Any remaining slack is concentrated strictly on the final page.
-      4. Total number of pages is minimized while preserving generous margins.
+    
+    Primary Rules:
+      1. Default target: MATCH EXACTLY 2 ABSTRACTS PER PAGE.
+      2. If 2 abstracts already fill >= 75% of the page, that page is complete!
+      3. A 3rd abstract is allowed ONLY if the first 2 abstracts are short (filling < 75%)
+         AND the 3rd abstract fits within the safe budget without risk of overflow.
+      4. Maximum 3 abstracts per page (NEVER 4).
+      5. Global Simulated Annealing finds the optimal pairings across all papers.
     """
     n = len(papers)
     if n == 0:
@@ -933,14 +936,21 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
         return [(0, 1)]
 
     height_matrix = _precompute_paper_heights(papers, CONTENT_WIDTH)
-    target_budget = avail_height - 25.0
+    target_budget = avail_height - 35.0
 
     def test_group(grp):
         k = len(grp)
         if k == 0:
             return True, 0.0, 0
-        if k > 3:  # Strictly maximum 3 abstracts per page (clean editorial layout)
+        if k > 3:  # Strictly maximum 3 abstracts per page
             return False, float('inf'), None
+        
+        # If 3 items, only allow if first 2 items are small (< 75% budget)
+        if k == 3:
+            h_first2 = height_matrix[grp[0]][0] + height_matrix[grp[1]][0] + TIER_SPECS[0]['sep_total']
+            if h_first2 >= target_budget * 0.75:
+                return False, float('inf'), None
+
         for t_idx, tier in enumerate(TIER_SPECS):
             h_papers = sum(height_matrix[i][t_idx] for i in grp)
             h_sep = (k - 1) * tier['sep_total']
@@ -952,7 +962,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     # Sort descending by standard height
     sorted_items = sorted(range(n), key=lambda i: height_matrix[i][0], reverse=True)
 
-    # 1. Best-Fit Decreasing (Max 3 items per bin)
+    # 1. Best-Fit Decreasing prioritizing 2 items per bin
     bins = []
     for item in sorted_items:
         best_b = -1
@@ -1006,20 +1016,28 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
             fits, tot, t_idx = test_group(b)
             if fits:
                 ratio = min(1.0, tot / avail_height)
-                if ratio >= 0.78:
-                    sc += 200.0 + (ratio * 100.0)
+                # Primary reward for 2-item pages reaching >= 75% fill
+                if len(b) == 2:
+                    if ratio >= 0.75:
+                        sc += 300.0 + (ratio * 100.0)
+                    else:
+                        sc += (ratio ** 2) * 150.0
+                elif len(b) == 3:
+                    # 3 items rewarded if well-packed without overflow
+                    if ratio >= 0.80:
+                        sc += 250.0 + (ratio * 80.0)
+                    else:
+                        sc += (ratio ** 2) * 100.0
                 else:
-                    sc += (ratio ** 2) * 80.0
-                # Bonus for 2 or 3 items (clean layout)
-                if len(b) in (2, 3):
-                    sc += 100.0
-                # Bonus for using standard generous margins
+                    sc += 20.0
+                
+                # Bonus for standard generous margins
                 if t_idx == 0:
-                    sc += 60.0
+                    sc += 50.0
                 elif t_idx == 1:
-                    sc += 30.0
+                    sc += 25.0
                 elif t_idx == 3:
-                    sc -= 30.0  # penalize over-squeezing
+                    sc -= 30.0
         return sc
 
     best_bins = [list(b) for b in multi_bins]
@@ -1090,7 +1108,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
     at the bottom of the page.
     """
     k = len(page_papers)
-    target_budget = avail_height - 22.0
+    target_budget = avail_height - 30.0
     best_tier = None
     base_h = 0
 
@@ -1107,13 +1125,13 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
         _, base_h = _build_and_measure_page(page_papers, page_paper_indices, best_tier, avail_width)
 
     # Calculate remaining white space (slack)
-    slack = (avail_height - 18.0) - base_h
+    slack = (avail_height - 25.0) - base_h
 
     # Vertically justify if there is slack and it's not a short final page
     if slack > 4.0 and (not is_final_page or (base_h / avail_height) >= 0.70):
         # Expansion points: 5 per paper + 2 per separator
         num_expand_points = 5 * k + (2 * (k - 1) if k > 1 else 0)
-        boost = min(10.0, slack / max(1, num_expand_points))
+        boost = min(8.0, slack / max(1, num_expand_points))
 
         # Iteratively verify that justified layout does not exceed target budget
         while boost >= 0.5:
@@ -1128,7 +1146,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
             justified_tier['sep_bottom'] = best_tier['sep_bottom'] + (boost * 1.4)
 
             flowables, final_h = _build_and_measure_page(page_papers, page_paper_indices, justified_tier, avail_width)
-            if final_h <= avail_height - 14.0:
+            if final_h <= avail_height - 20.0:
                 return flowables, justified_tier['name'], final_h
             boost -= 0.5
 
