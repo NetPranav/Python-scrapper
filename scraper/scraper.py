@@ -1018,24 +1018,30 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
             fits, tot, t_idx = test_group(b)
             if not fits:
                 return -1e9  # strictly invalid
-            ratio = min(1.0, tot / avail_height)
 
-            # Heavy penalty for single-abstract pages that are not the final page!
-            if len(b) == 1:
-                if b_idx < num_bins - 1:
-                    sc -= 10000.0  # intermediate single-item page is strictly penalized
+            ratio = min(1.0, tot / avail_height)
+            is_last_page = (b_idx == num_bins - 1)
+
+            # RULE: Every non-final page MUST have >= 2 abstracts and >= 75% fill
+            if not is_last_page:
+                if len(b) < 2:
+                    return -1e9  # Forbidden: non-final page cannot have 1 abstract
+                if ratio < 0.75:
+                    sc -= 50000.0 * (0.75 - ratio)  # Extreme penalty for under-filled non-final page
+
+            if len(b) == 2:
+                if ratio >= 0.75:
+                    sc += 800.0 + (ratio * 300.0)
                 else:
-                    sc += 50.0     # acceptable only as final page remainder
-            elif len(b) == 2:
-                if ratio >= 0.70:
+                    sc += 150.0 + (ratio * 100.0)
+            elif len(b) == 3:
+                if ratio >= 0.78:
                     sc += 600.0 + (ratio * 250.0)
                 else:
-                    sc += 250.0 + (ratio * 100.0)
-            elif len(b) == 3:
-                if ratio >= 0.75:
-                    sc += 450.0 + (ratio * 180.0)
-                else:
-                    sc += 200.0 + (ratio * 100.0)
+                    sc += 120.0 + (ratio * 80.0)
+            elif len(b) == 1:
+                # Allowed ONLY on the final page
+                sc += 50.0
 
             # Bonus for standard generous margins
             if t_idx == 0:
@@ -1125,7 +1131,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
     at the bottom of the page.
     """
     k = len(page_papers)
-    target_budget = avail_height - 30.0
+    target_budget = avail_height - 35.0
     best_tier = None
     base_h = 0
 
@@ -1142,13 +1148,13 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
         _, base_h = _build_and_measure_page(page_papers, page_paper_indices, best_tier, avail_width)
 
     # Calculate remaining white space (slack)
-    slack = (avail_height - 25.0) - base_h
+    slack = (avail_height - 30.0) - base_h
 
     # Vertically justify if there is slack and it's not a short final page
     if slack > 4.0 and (not is_final_page or (base_h / avail_height) >= 0.70):
         # Expansion points: 5 per paper + 2 per separator
         num_expand_points = 5 * k + (2 * (k - 1) if k > 1 else 0)
-        boost = min(8.0, slack / max(1, num_expand_points))
+        boost = min(7.0, slack / max(1, num_expand_points))
 
         # Iteratively verify that justified layout does not exceed target budget
         while boost >= 0.5:
@@ -1163,7 +1169,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
             justified_tier['sep_bottom'] = best_tier['sep_bottom'] + (boost * 1.4)
 
             flowables, final_h = _build_and_measure_page(page_papers, page_paper_indices, justified_tier, avail_width)
-            if final_h <= avail_height - 20.0:
+            if final_h <= avail_height - 25.0:
                 return flowables, justified_tier['name'], final_h
             boost -= 0.5
 
