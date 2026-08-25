@@ -759,42 +759,33 @@ TIER_SPECS = [
         'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
         'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE,
         'leading_factor': LINE_SPACING_FACTOR,
-        'space_title': 4, 'space_auth': 6, 'space_abs': 4, 'space_kw': 4, 'spacer_auth_abs': 3,
-        'sep_top': 4, 'sep_dot': 14, 'sep_bottom': 6, 'sep_total': 24
+        'space_title': 5, 'space_auth': 8, 'space_abs': 5, 'space_kw': 6, 'spacer_auth_abs': 4,
+        'sep_top': 6, 'sep_dot': 14, 'sep_bottom': 8, 'sep_total': 28
     },
     # Tier 1: Compact Margins & Separator
     {
-        'name': 'compact',
+        'name': 'compact_margins',
         'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
         'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE,
-        'leading_factor': max(1.30, LINE_SPACING_FACTOR * 0.92),
-        'space_title': 2, 'space_auth': 3, 'space_abs': 2, 'space_kw': 2, 'spacer_auth_abs': 2,
-        'sep_top': 2, 'sep_dot': 10, 'sep_bottom': 3, 'sep_total': 15
+        'leading_factor': LINE_SPACING_FACTOR,
+        'space_title': 3, 'space_auth': 4, 'space_abs': 3, 'space_kw': 3, 'spacer_auth_abs': 2,
+        'sep_top': 3, 'sep_dot': 10, 'sep_bottom': 4, 'sep_total': 17
     },
-    # Tier 2: Squeezed Line Spacing & Micro Margins
+    # Tier 2: Tight Margins & Divider
     {
-        'name': 'squeezed',
-        'font_title': max(11.0, TITLE_FONT_SIZE - 0.5),
-        'font_auth': max(8.5, AUTHORS_FONT_SIZE - 0.5),
-        'font_abs': max(8.5, ABSTRACT_FONT_SIZE - 0.5),
-        'font_kw': max(8.5, KEYWORDS_FONT_SIZE - 0.5),
-        'leading_factor': max(1.22, LINE_SPACING_FACTOR * 0.85),
-        'space_title': 2, 'space_auth': 2, 'space_abs': 2, 'space_kw': 1, 'spacer_auth_abs': 1,
-        'sep_top': 1, 'sep_dot': 8, 'sep_bottom': 2, 'sep_total': 11
+        'name': 'tight_margins',
+        'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+        'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE,
+        'leading_factor': LINE_SPACING_FACTOR,
+        'space_title': 2, 'space_auth': 2, 'space_abs': 2, 'space_kw': 2, 'spacer_auth_abs': 1,
+        'sep_top': 2, 'sep_dot': 6, 'sep_bottom': 2, 'sep_total': 10
     },
-    # Tier 3: High Density Squeeze
+    # Tier 3: Zero Margins & Minimal Divider
     {
-        'name': 'high_squeeze',
-        'font_title': 10.5, 'font_auth': 8.0, 'font_abs': 8.5, 'font_kw': 8.0,
-        'leading_factor': 1.16,
-        'space_title': 1, 'space_auth': 1, 'space_abs': 1, 'space_kw': 1, 'spacer_auth_abs': 1,
-        'sep_top': 1, 'sep_dot': 6, 'sep_bottom': 1, 'sep_total': 8
-    },
-    # Tier 4: Ultra Squeeze
-    {
-        'name': 'ultra_squeeze',
-        'font_title': 9.8, 'font_auth': 7.5, 'font_abs': 7.8, 'font_kw': 7.5,
-        'leading_factor': 1.12,
+        'name': 'zero_margins',
+        'font_title': TITLE_FONT_SIZE, 'font_auth': AUTHORS_FONT_SIZE,
+        'font_abs': ABSTRACT_FONT_SIZE, 'font_kw': KEYWORDS_FONT_SIZE,
+        'leading_factor': LINE_SPACING_FACTOR,
         'space_title': 1, 'space_auth': 1, 'space_abs': 1, 'space_kw': 1, 'spacer_auth_abs': 1,
         'sep_top': 1, 'sep_dot': 4, 'sep_bottom': 1, 'sep_total': 6
     }
@@ -2153,28 +2144,35 @@ def generate_word_output(papers, page_groups, page_density_modes, page_map, outp
         if pg_idx > 0:
             doc.add_page_break()
 
-        # Density mode spacing
-        if mode == 'ultra_compact':
+        # Density mode spacing (margins only, font/line height constant)
+        if 'zero_margins' in mode:
+            title_space_after = Pt(1)
+            auth_space_after = Pt(1)
+            abs_space_after = Pt(1)
+            kw_space_after = Pt(1)
+            sep_space_before = Pt(1)
+            sep_space_after = Pt(1)
+        elif 'tight_margins' in mode:
             title_space_after = Pt(2)
             auth_space_after = Pt(2)
             abs_space_after = Pt(2)
             kw_space_after = Pt(2)
             sep_space_before = Pt(2)
-            sep_space_after = Pt(4)
-        elif mode == 'compact':
+            sep_space_after = Pt(3)
+        elif 'compact_margins' in mode:
             title_space_after = Pt(3)
             auth_space_after = Pt(4)
             abs_space_after = Pt(3)
             kw_space_after = Pt(3)
-            sep_space_before = Pt(4)
-            sep_space_after = Pt(6)
-        else:
+            sep_space_before = Pt(3)
+            sep_space_after = Pt(4)
+        else:  # standard
             title_space_after = Pt(5)
             auth_space_after = Pt(8)
             abs_space_after = Pt(5)
             kw_space_after = Pt(6)
             sep_space_before = Pt(6)
-            sep_space_after = Pt(10)
+            sep_space_after = Pt(8)
 
         for item_idx, paper_idx in enumerate(group):
             paper = papers[paper_idx]
