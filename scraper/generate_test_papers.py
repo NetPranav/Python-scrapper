@@ -23,54 +23,59 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 # ── Procedural Data Dictionaries ──
 
 DOMAINS = [
-    ("Artificial Intelligence", "Deep Learning", "Neural Architectures"),
-    ("Quantum Computing", "Post-Quantum Cryptography", "Quantum Key Distribution"),
-    ("Cyber-Physical Systems", "Industrial IoT", "Edge Anomaly Detection"),
-    ("6G Telecommunications", "Massive MIMO", "Millimeter-Wave Beamforming"),
-    ("Medical Imaging", "Multimodal Reconstruction", "Diagnostic Vision Transformers"),
-    ("Autonomous Robotics", "LiDAR Odometry", "Path Planning & Swarm Coordination"),
-    ("Cloud Infrastructure", "Serverless Orchestration", "Federated Gradient Compression"),
-    ("Smart Grids", "Renewable Integration", "Phasor Measurement & Power Optimization"),
-    ("Natural Language Processing", "Attention Mechanisms", "Knowledge Distillation"),
-    ("Cybersecurity", "Zero-Trust Architectures", "Automated Threat Neutralization")
+    ("Autonomous Electric Mobility", "Solid-State Battery Management", "V2X Telemetry"),
+    ("Genomic Sequencing Informatics", "CRISPR-Cas9 Off-Target Analysis", "Epigenetic Modeling"),
+    ("Deep-Space Optical Telemetry", "CubeSat Laser Mesh Networks", "Attitude Determination"),
+    ("Neuromorphic Computing", "Spiking Neural Circuits", "Memristive Synaptic Arrays"),
+    ("Sustainable Green Hydrogen", "Electrolyzer Cell Efficiency", "Microgrid Load Balancing"),
+    ("Quantum Photonics", "Continuous-Variable QKD", "Photonic Qubit Transduction"),
+    ("Smart Precision Agritech", "Multispectral Canopy Profiling", "Autonomous Crop Robotics"),
+    ("Advanced Robotic Surgery", "Sub-Millimeter Motion Scaling", "Haptic Teleoperation"),
+    ("Zero-Knowledge Cryptography", "zk-SNARK Rollups", "Cross-Chain Liquidity Bridges"),
+    ("Hypersonic Aerodynamics", "Plasma Flow Actuation", "Boundary Layer Stability"),
+    ("Multimodal Edge Intelligence", "Sparse Mixture-of-Experts", "Speculative Decoder Gating"),
+    ("Wearable Biosensing Devices", "Photoplethysmography De-noising", "Bio-impedance Spectroscopy")
 ]
 
 FIRST_NAMES = [
     "Aarav", "Priyanka", "Tejaswi", "Suresh", "Kailash", "Garima", "Siddharth",
     "Vivek", "Rashmi", "Tapan", "Arpit", "Praveen", "Mitesh", "Sanyog", "Ananya",
     "Vikramaditya", "Rajeshwari", "Alok", "Meenakshi", "Sunita", "Rohan", "Divya",
-    "Kavita", "Aditya", "Neha", "Nikhil", "Isha", "Manish", "Shweta", "Harish"
+    "Kavita", "Aditya", "Neha", "Nikhil", "Isha", "Manish", "Shweta", "Harish",
+    "Tanvi", "Abhinav", "Devanshi", "Tarun", "Karan", "Pooja", "Aayush", "Gaurav"
 ]
 
 LAST_NAMES = [
     "Sharma", "Singh", "Palisetti", "Jain", "Bandhu", "Mathur", "Parihar",
     "Gupta", "Jangid", "Nahar", "Rawat", "Solanki", "Roy", "Sen", "Swaminathan",
     "Nath", "Sundaram", "Deshmukh", "Verma", "Chopra", "Reddy", "Patel",
-    "Bose", "Menon", "Mukherjee", "Iyer", "Rao", "Dubey", "Mehta", "Bhat"
+    "Bose", "Menon", "Mukherjee", "Iyer", "Rao", "Dubey", "Mehta", "Bhat",
+    "Chakraborty", "Sengupta", "Kulkarni", "Bhattacharya", "Agarwal", "Mishra"
 ]
 
 DEPARTMENTS = [
     "Department of Computer Science and Engineering",
-    "Department of Electronics and Communication Engineering",
-    "Department of Information and Communication Technology",
-    "Department of Electrical Engineering",
+    "Department of Aerospace and Astronautical Engineering",
+    "Department of Biotechnology and Genetic Engineering",
+    "Department of Electrical and Energy Systems Engineering",
     "School of Artificial Intelligence and Data Science",
-    "Center for Computational Biology and Medical Imaging",
-    "Department of Cyber Security and Forensics",
-    "Department of Physics and Quantum Technologies"
+    "Center for Computational Biology and Genomic Informatics",
+    "Department of Cyber Security and Applied Cryptography",
+    "Department of Quantum Physics and Nanophotonics",
+    "School of Robotics and Autonomous Mechatronics"
 ]
 
 INSTITUTIONS = [
-    "Indian Institute of Technology Bombay, Maharashtra, India",
-    "Indian Institute of Technology Delhi, New Delhi, India",
-    "Manipal University Jaipur, Rajasthan, India",
-    "Amrita School of Engineering, Coimbatore, Tamil Nadu, India",
+    "Indian Institute of Technology Bombay, Powai, Mumbai, India",
+    "Indian Institute of Technology Delhi, Hauz Khas, New Delhi, India",
+    "Indian Institute of Science, Bengaluru, Karnataka, India",
+    "Manipal Academy of Higher Education, Manipal, Karnataka, India",
     "Sagar Institute of Science and Technology, Bhopal, Madhya Pradesh, India",
-    "Medicaps University, Indore, Madhya Pradesh, India",
-    "Oriental College of Technology, Bhopal, Madhya Pradesh, India",
-    "National Institute of Technology Karnataka, Surathkal, Karnataka, India",
+    "Birla Institute of Technology and Science, Pilani, Rajasthan, India",
+    "National Institute of Technology Karnataka, Surathkal, Mangalore, India",
     "All India Institute of Medical Sciences, New Delhi, India",
-    "Birla Institute of Technology and Science, Pilani, Rajasthan, India"
+    "Amrita Vishwa Vidyapeetham, Coimbatore, Tamil Nadu, India",
+    "Medicaps University, A.B. Road, Indore, Madhya Pradesh, India"
 ]
 
 TITLE_TEMPLATES_SHORT = [
@@ -78,6 +83,7 @@ TITLE_TEMPLATES_SHORT = [
     "Design of {method} in {domain}",
     "{metric} Analysis of {domain} Networks",
     "Secure {method} Protocols for {domain}",
+    "High-Performance {method} in {domain}",
 ]
 
 TITLE_TEMPLATES_MEDIUM = [
@@ -85,28 +91,33 @@ TITLE_TEMPLATES_MEDIUM = [
     "Empirical Evaluation of {method} and {secondary} in Heterogeneous {domain}",
     "Optimizing {metric} in Distributed {domain} via Adaptive {method}",
     "Fault-Tolerant {method} Frameworks for Next-Generation {domain}",
+    "A Scalable {method} Pipeline for Real-Time {domain} Diagnostics",
 ]
 
 TITLE_TEMPLATES_LONG = [
     "Comprehensive Benchmarking of {method} and {secondary} Architectures for Real-Time {domain} and Diagnostic Optimization",
     "Autonomous Threat Mitigation and Dynamic Resource Allocation in Large-Scale {domain} via Multi-Agent {method} Ensembles",
     "Hierarchical Optimization of Energy Efficiency and {metric} in Dense {domain} using Physics-Informed {method}",
+    "High-Precision Synthesis of {method} and {secondary} for Ultra-Low-Latency {domain} Infrastructure",
 ]
 
 METHODS = [
-    "Neural Beamforming", "Federated Optimization", "Graph Neural Network", "Quantum Key Encapsulation",
+    "Neural Beamforming", "Federated Gradient Compression", "Graph Neural Network", "Quantum Key Encapsulation",
     "Transformer Diffusion", "Reinforcement Learning", "Gradient Sparsification", "Consensus Protocol",
-    "Micro-Telemetry", "Topological Feature Extraction", "Lattice Cryptography", "Dynamic Cache Sharding"
+    "Micro-Telemetry", "Topological Feature Extraction", "Lattice Cryptography", "Dynamic Cache Sharding",
+    "Spiking Synaptic Plasticity", "Sparse Mixture-of-Experts", "zk-SNARK Verification", "Wavelet Denoising"
 ]
 
 SECONDARIES = [
     "Wavelet Reconstruction", "Attention Mechanisms", "Momentum Caching", "Edge Ensembles",
-    "Probabilistic Reasoning", "Zero-Knowledge Proofs", "Non-IID Clustering", "Temporal Gating"
+    "Probabilistic Reasoning", "Zero-Knowledge Proofs", "Non-IID Clustering", "Temporal Gating",
+    "Low-Rank Adaptation", "Specular Reflection Suppression", "Self-Supervised Contrastive Losses"
 ]
 
 METRICS = [
     "Latency and Throughput", "Energy Efficiency", "Convergence Rate", "Spectral Purity",
-    "Fault Tolerance", "Reconstruction Fidelity", "Computational Complexity", "Resilience"
+    "Fault Tolerance", "Reconstruction Fidelity", "Computational Complexity", "Resilience",
+    "Thermodynamic Efficiency", "Signal-to-Noise Ratio"
 ]
 
 ABSTRACT_SENTENCES_OPENING = [
@@ -114,7 +125,8 @@ ABSTRACT_SENTENCES_OPENING = [
     "Large-scale deployments of modern {domain} systems frequently encounter severe communication bottlenecks, computational stragglers, and non-stationary stochastic data drifts that hinder overall convergence.",
     "Ensuring high-fidelity operation, cryptographic resilience, and energy efficiency in resource-constrained {domain} remains a fundamental open challenge across applied academic and industrial engineering.",
     "Next-generation {domain} architectures necessitate adaptive optimization methods that respond seamlessly to dynamic operational conditions, bursty workloads, and unpredictable telemetry interruptions.",
-    "The exponential growth of high-frequency telemetry streams in modern {domain} calls for resilient, decentralized algorithmic paradigms capable of real-time parameter synthesis and error mitigation."
+    "The exponential growth of high-frequency telemetry streams in modern {domain} calls for resilient, decentralized algorithmic paradigms capable of real-time parameter synthesis and error mitigation.",
+    "Deploying robust autonomy within {domain} demands ultra-reliable communication links and compute-efficient algorithmic accelerators capable of operating under strict thermal and power limits."
 ]
 
 ABSTRACT_SENTENCES_PROPOSAL = [
@@ -122,7 +134,8 @@ ABSTRACT_SENTENCES_PROPOSAL = [
     "We introduce an end-to-end algorithmic pipeline that utilizes {method} for real-time parameter tuning, robust anomaly suppression, and distributed load balancing.",
     "To overcome these pervasive limitations, we design a hierarchical {method} model that adaptively balances local computing budgets against global transmission costs.",
     "Our approach synthesizes multi-layer {method} representations with localized {secondary} techniques to maximize overall operational reliability and throughput.",
-    "We establish a theoretical formulation and an empirical prototype utilizing specialized {method} modules tailored for heterogeneous embedded hardware nodes."
+    "We establish a theoretical formulation and an empirical prototype utilizing specialized {method} modules tailored for heterogeneous embedded hardware nodes.",
+    "This work presents a lightweight, hardware-accelerated {method} implementation that dynamically adapts to channel volatility and compute constraints."
 ]
 
 ABSTRACT_SENTENCES_DETAILS = [
@@ -150,7 +163,8 @@ KEYWORDS_POOL = [
     "Machine Learning", "Neural Networks", "Deep Learning", "Edge Computing", "IoT Networks",
     "Optimization", "Signal Processing", "Cybersecurity", "Blockchain", "Quantum Key Distribution",
     "Federated Learning", "Graph Neural Networks", "Transformers", "Computer Vision", "Real-Time Telemetry",
-    "Fault Tolerance", "Embedded Systems", "Resource Allocation", "Energy Efficiency", "Anomaly Detection"
+    "Fault Tolerance", "Embedded Systems", "Resource Allocation", "Energy Efficiency", "Anomaly Detection",
+    "Autonomous Robotics", "Bio-impedance", "Genomic Sequencing", "Battery Management", "Plasma Actuation"
 ]
 
 
