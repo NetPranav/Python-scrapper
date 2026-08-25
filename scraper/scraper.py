@@ -1009,49 +1009,56 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     if unmatched:
         multi_bins.append(unmatched)
 
-    # 3. Fast Simulated Annealing / Local Search with 3000 Iterations
+    # 3. Fast Simulated Annealing / Local Search with 5000 Iterations
     def score_partition(part):
         sc = 0.0
-        for b in part:
+        valid_bins = [b for b in part if b]
+        num_bins = len(valid_bins)
+        for b_idx, b in enumerate(valid_bins):
             fits, tot, t_idx = test_group(b)
-            if fits:
-                ratio = min(1.0, tot / avail_height)
-                # Primary reward for 2-item pages reaching >= 75% fill
-                if len(b) == 2:
-                    if ratio >= 0.75:
-                        sc += 300.0 + (ratio * 100.0)
-                    else:
-                        sc += (ratio ** 2) * 150.0
-                elif len(b) == 3:
-                    # 3 items rewarded if well-packed without overflow
-                    if ratio >= 0.80:
-                        sc += 250.0 + (ratio * 80.0)
-                    else:
-                        sc += (ratio ** 2) * 100.0
+            if not fits:
+                return -1e9  # strictly invalid
+            ratio = min(1.0, tot / avail_height)
+
+            # Heavy penalty for single-abstract pages that are not the final page!
+            if len(b) == 1:
+                if b_idx < num_bins - 1:
+                    sc -= 10000.0  # intermediate single-item page is strictly penalized
                 else:
-                    sc += 20.0
-                
-                # Bonus for standard generous margins
-                if t_idx == 0:
-                    sc += 50.0
-                elif t_idx == 1:
-                    sc += 25.0
-                elif t_idx == 3:
-                    sc -= 30.0
+                    sc += 50.0     # acceptable only as final page remainder
+            elif len(b) == 2:
+                if ratio >= 0.70:
+                    sc += 600.0 + (ratio * 250.0)
+                else:
+                    sc += 250.0 + (ratio * 100.0)
+            elif len(b) == 3:
+                if ratio >= 0.75:
+                    sc += 450.0 + (ratio * 180.0)
+                else:
+                    sc += 200.0 + (ratio * 100.0)
+
+            # Bonus for standard generous margins
+            if t_idx == 0:
+                sc += 60.0
+            elif t_idx == 1:
+                sc += 30.0
+            elif t_idx == 3:
+                sc -= 40.0
         return sc
 
     best_bins = [list(b) for b in multi_bins]
     best_score = score_partition(best_bins)
     curr_bins = [list(b) for b in best_bins]
 
-    for it in range(3000):
+    for it in range(5000):
+        curr_bins = [b for b in curr_bins if b]
         if len(curr_bins) < 2:
             break
         b1_idx, b2_idx = random.sample(range(len(curr_bins)), 2)
         b1 = curr_bins[b1_idx]
         b2 = curr_bins[b2_idx]
 
-        # Try item swap
+        # Move 1: Try item swap between b1 and b2
         if b1 and b2:
             i1 = random.randrange(len(b1))
             i2 = random.randrange(len(b2))
@@ -1068,37 +1075,47 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
                     sc = score_partition(cand_part)
                     if sc > best_score:
                         best_score = sc
-                        best_bins = [list(b) for b in cand_part]
+                        best_bins = [list(b) for b in cand_part if b]
                         curr_bins = cand_part
                         continue
 
-        # Try item transfer if b1 has 3 and b2 has <= 2
-        if len(b1) >= 3 and len(b2) <= 2:
+        # Move 2: Try item transfer from b1 to b2 (merge / dissolve single bins)
+        if len(b1) >= 1 and len(b2) <= 2:
             i1 = random.randrange(len(b1))
             c1 = [x for idx, x in enumerate(b1) if idx != i1]
             c2 = b2 + [b1[i1]]
-            f1, _, _ = test_group(c1)
+            f1, _, _ = test_group(c1) if c1 else (True, 0, 0)
             f2, _, _ = test_group(c2)
             if f1 and f2:
                 cand_part = list(curr_bins)
                 cand_part[b1_idx] = c1
                 cand_part[b2_idx] = c2
+                cand_part = [b for b in cand_part if b]
                 sc = score_partition(cand_part)
                 if sc > best_score:
                     best_score = sc
                     best_bins = [list(b) for b in cand_part]
                     curr_bins = cand_part
 
-    # Sort final page groups descending by fill percentage
-    page_records = []
-    for b in best_bins:
-        if not b:
-            continue
-        _, tot, t_idx = test_group(b)
-        page_records.append((tuple(b), tot, t_idx))
+    # Clean empty bins and sort final page groups
+    clean_bins = [b for b in best_bins if b]
+    
+    # Ensure multi-item bins appear first, single remainder appears strictly last
+    multi_groups = [b for b in clean_bins if len(b) >= 2]
+    single_groups = [b for b in clean_bins if len(b) == 1]
 
-    page_records.sort(key=lambda rec: rec[1], reverse=True)
-    return [rec[0] for rec in page_records]
+    # Sort multi-groups descending by fill percentage
+    multi_records = []
+    for b in multi_groups:
+        _, tot, t_idx = test_group(b)
+        multi_records.append((tuple(b), tot, t_idx))
+    multi_records.sort(key=lambda rec: rec[1], reverse=True)
+
+    final_groups = [rec[0] for rec in multi_records]
+    for s in single_groups:
+        final_groups.append(tuple(s))
+
+    return final_groups
 
 
 def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_width, avail_height, is_final_page=False):
@@ -1222,9 +1239,8 @@ def generate_body_pdf(papers, output_path):
         if pg_num > 0:
             elements.append(PageBreak())
 
-        # Wrap all flowables for this page in KeepTogether to guarantee single-page fit
-        page_container = KeepTogether(flowables)
-        elements.append(page_container)
+        # Directly extend flowables (each paper is already an atomic KeepTogether block)
+        elements.extend(flowables)
 
     # Build the PDF
     doc.build(elements)
