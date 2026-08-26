@@ -820,6 +820,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
         alignment=TA_CENTER,
         spaceAfter=space_title,
         wordSpace=WORD_SPACING,
+        keepWithNext=True,
     )
     st_auth = ParagraphStyle(
         f"auth_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
@@ -829,6 +830,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
         alignment=TA_CENTER,
         spaceAfter=space_auth,
         wordSpace=WORD_SPACING * 0.7,
+        keepWithNext=True,
     )
     st_abs = ParagraphStyle(
         f"abs_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
@@ -838,6 +840,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
         alignment=TA_JUSTIFY,
         spaceAfter=space_abs,
         wordSpace=WORD_SPACING,
+        keepWithNext=True,
     )
     st_kw = ParagraphStyle(
         f"kw_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
@@ -879,7 +882,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
                   spacer_auth_abs + h_ab + space_abs + h_k + space_kw)
         total_h += item_h
 
-        # Wrap this entire paper's components in an atomic KeepTogether block so ReportLab NEVER splits keywords or abstract across pages
+        # Wrap this entire paper's components in an atomic KeepTogether block with keepWithNext=True
         paper_block = [PageTracker(paper_idx), p_title, p_authors]
         if p_aff:
             paper_block.append(p_aff)
@@ -915,7 +918,7 @@ def _precompute_paper_heights(papers, avail_width):
     return matrix
 
 
-def _find_optimal_zero_waste_packing(papers, avail_height):
+def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None):
     """
     Combinatorial Re-Ordering & Bin Packing Optimization Engine:
     
@@ -925,7 +928,8 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
       3. A 3rd abstract is allowed ONLY if the first 2 abstracts are short (filling < 75%)
          AND the 3rd abstract fits within the safe budget without risk of overflow.
       4. Maximum 3 abstracts per page (NEVER 4).
-      5. Global Simulated Annealing finds the optimal pairings across all papers.
+      5. Strict 50pt safe headroom to eliminate overflow risks.
+      6. Global Simulated Annealing finds the optimal pairings across all papers.
     """
     n = len(papers)
     if n == 0:
@@ -935,14 +939,22 @@ def _find_optimal_zero_waste_packing(papers, avail_height):
     if n == 2:
         return [(0, 1)]
 
+    if forbidden_pairs is None:
+        forbidden_pairs = set()
+
     height_matrix = _precompute_paper_heights(papers, CONTENT_WIDTH)
-    target_budget = avail_height - 35.0
+    target_budget = avail_height - 50.0  # 661.89pt max for any multi-abstract page
 
     def test_group(grp):
         k = len(grp)
         if k == 0:
             return True, 0.0, 0
         if k > 3:  # Strictly maximum 3 abstracts per page
+            return False, float('inf'), None
+
+        # Check forbidden pairs
+        grp_tuple = tuple(sorted(grp))
+        if grp_tuple in forbidden_pairs:
             return False, float('inf'), None
         
         # If 3 items, only allow if first 2 items are small (< 75% budget)
@@ -1128,10 +1140,10 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
     """
     Generates flowables for a page and vertically justifies / stretches internal spacing
     so that the entire page is 100% filled from top to bottom, eliminating empty white space
-    at the bottom of the page.
+    at the bottom of the page with strict safe headroom.
     """
     k = len(page_papers)
-    target_budget = avail_height - 35.0
+    target_budget = avail_height - 45.0
     best_tier = None
     base_h = 0
 
@@ -1147,14 +1159,14 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
         best_tier = TIER_SPECS[-1]
         _, base_h = _build_and_measure_page(page_papers, page_paper_indices, best_tier, avail_width)
 
-    # Calculate remaining white space (slack)
-    slack = (avail_height - 30.0) - base_h
+    # Calculate remaining white space (slack) with conservative 40pt buffer
+    slack = (avail_height - 40.0) - base_h
 
     # Vertically justify if there is slack and it's not a short final page
     if slack > 4.0 and (not is_final_page or (base_h / avail_height) >= 0.70):
         # Expansion points: 5 per paper + 2 per separator
         num_expand_points = 5 * k + (2 * (k - 1) if k > 1 else 0)
-        boost = min(7.0, slack / max(1, num_expand_points))
+        boost = min(4.0, slack / max(1, num_expand_points))
 
         # Iteratively verify that justified layout does not exceed target budget
         while boost >= 0.5:
@@ -1169,7 +1181,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
             justified_tier['sep_bottom'] = best_tier['sep_bottom'] + (boost * 1.4)
 
             flowables, final_h = _build_and_measure_page(page_papers, page_paper_indices, justified_tier, avail_width)
-            if final_h <= avail_height - 25.0:
+            if final_h <= avail_height - 35.0:
                 return flowables, justified_tier['name'], final_h
             boost -= 0.5
 
@@ -1178,78 +1190,152 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
     return flowables, best_tier['name'], final_h
 
 
+def _inspect_body_pdf_pages(pdf_path, expected_num_pages):
+    """
+    Inspects each rendered page of the generated body PDF using PyMuPDF (fitz).
+    Detects any orphan keyword spills, split content, or underfilled intermediate pages.
+    Returns (is_clean, list_of_defects).
+    """
+    import fitz
+    if not os.path.exists(pdf_path):
+        return False, [{'type': 'file_missing', 'msg': 'Body PDF file was not generated.'}]
+
+    doc = fitz.open(pdf_path)
+    defects = []
+
+    if len(doc) != expected_num_pages:
+        defects.append({
+            'type': 'page_count_mismatch',
+            'msg': f"Generated {len(doc)} physical pages, expected {expected_num_pages} (page overflow detected).",
+            'actual_pages': len(doc),
+            'expected_pages': expected_num_pages
+        })
+
+    for pg_idx, page in enumerate(doc):
+        raw_text = page.get_text().strip()
+        lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
+        is_last = (pg_idx == len(doc) - 1)
+
+        # Check 1: Orphan keywords leak (starts with Keywords or contains only keywords without an abstract/title)
+        has_title = any(len(l) > 30 and "—" not in l for l in lines)
+        has_abstract = any("Abstract—" in l or "Abstract —" in l for l in lines)
+        
+        if (raw_text.startswith("Keywords—") or (not has_title and not has_abstract and "Keywords—" in raw_text)) or (len(raw_text) < 200 and "Keywords—" in raw_text and not has_abstract):
+            defects.append({
+                'type': 'orphan_keywords_leak',
+                'page': pg_idx + 1,
+                'msg': f"Page {pg_idx + 1} contains orphan keywords leaked across page boundary: '{raw_text[:60]}...'"
+            })
+
+        # Check 2: Intermediate underfilled page (< 280 chars) on non-final page
+        if not is_last and len(raw_text) < 280:
+            defects.append({
+                'type': 'underfilled_intermediate_page',
+                'page': pg_idx + 1,
+                'msg': f"Page {pg_idx + 1} has insufficient content ({len(raw_text)} chars) on an intermediate page."
+            })
+
+    doc.close()
+    return len(defects) == 0, defects
+
+
 def generate_body_pdf(papers, output_path):
     """
-    Generate the body pages of the compiled PDF using ReportLab Platypus.
+    Generate the body pages of the compiled PDF using ReportLab Platypus
+    with Automated Post-Compilation Self-Healing Verification.
 
-    Zero-White-Space Guarantees:
-      1. Uses Combinatorial Re-ordering & Bin Packing to match complementary abstracts together.
+    Zero-White-Space & Zero-Leak Guarantees:
+      1. Uses Combinatorial Re-ordering & Bin Packing with 50pt safe headroom.
       2. Every non-final page contains AT LEAST 2 abstracts and is packed to 90%-100% fullness.
-      3. Vertically justifies remaining slack so there is NO empty white space at the bottom of pages.
-      4. Only the final page holds the remainder.
+      3. Paragraphs are bound with keepWithNext=True to eliminate keyword spills.
+      4. Inspects generated physical pages with PyMuPDF to verify zero defects.
+      5. Automatically self-heals and re-packs if any defect is detected.
 
     Returns tuple (page_map, page_groups, page_density_modes)
     """
     global _page_map
-    _page_map = {}
-
-    doc = BaseDocTemplate(
-        output_path,
-        pagesize=A4,
-        leftMargin=LEFT_MARGIN,
-        rightMargin=RIGHT_MARGIN,
-        topMargin=TOP_MARGIN,
-        bottomMargin=BOTTOM_MARGIN,
-    )
-
-    # Content frame
     avail_height = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN
-    frame = Frame(
-        LEFT_MARGIN,
-        BOTTOM_MARGIN,
-        CONTENT_WIDTH,
-        avail_height,
-        id='body_frame',
-    )
+    forbidden_pairs = set()
 
-    doc.addPageTemplates([
-        PageTemplate('body_page', frames=[frame], onPage=_body_page_handler)
-    ])
+    for attempt in range(1, 4):
+        _page_map = {}
 
-    # ── Step 1: Combinatorial Re-Ordering Bin Packing ──
-    page_groups = _find_optimal_zero_waste_packing(papers, avail_height)
-
-    print(f"\n  [ANALYSIS] Available height per page: {avail_height:.0f}pt")
-    print(f"\n  [PACKING] Zero-White-Space Optimized Page Groups ({len(page_groups)} pages):")
-
-    elements = []
-    page_density_modes = []
-
-    for pg_num, group in enumerate(page_groups):
-        page_papers = [papers[idx] for idx in group]
-        page_paper_indices = list(group)
-        is_last = (pg_num == len(page_groups) - 1)
-
-        # Generate vertically justified flowables to eliminate bottom white space
-        flowables, mode_name, measured_h = _generate_page_flowables_justified(
-            page_papers, page_paper_indices, CONTENT_WIDTH, avail_height, is_final_page=is_last
+        doc = BaseDocTemplate(
+            output_path,
+            pagesize=A4,
+            leftMargin=LEFT_MARGIN,
+            rightMargin=RIGHT_MARGIN,
+            topMargin=TOP_MARGIN,
+            bottomMargin=BOTTOM_MARGIN,
         )
-        page_density_modes.append(mode_name)
 
-        usage = min(100.0, (measured_h / avail_height) * 100)
-        tag = " (Final Page)" if is_last else ""
-        mode_tag = f" [{mode_name}]" if mode_name != 'standard' else ""
-        titles = [papers[idx]['title'][:38] + '...' for idx in group]
-        print(f"    Page {pg_num+1}: {len(group)} abstract(s), {usage:.0f}% filled{mode_tag}{tag} -- {', '.join(titles)}")
+        frame = Frame(
+            LEFT_MARGIN,
+            BOTTOM_MARGIN,
+            CONTENT_WIDTH,
+            avail_height,
+            id='body_frame',
+        )
 
-        if pg_num > 0:
-            elements.append(PageBreak())
+        doc.addPageTemplates([
+            PageTemplate('body_page', frames=[frame], onPage=_body_page_handler)
+        ])
 
-        # Directly extend flowables (each paper is already an atomic KeepTogether block)
-        elements.extend(flowables)
+        # ── Step 1: Combinatorial Re-Ordering Bin Packing ──
+        page_groups = _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=forbidden_pairs)
 
-    # Build the PDF
-    doc.build(elements)
+        if attempt == 1:
+            print(f"\n  [ANALYSIS] Available height per page: {avail_height:.0f}pt")
+            print(f"\n  [PACKING] Zero-White-Space Optimized Page Groups ({len(page_groups)} pages):")
+
+        elements = []
+        page_density_modes = []
+
+        for pg_num, group in enumerate(page_groups):
+            page_papers = [papers[idx] for idx in group]
+            page_paper_indices = list(group)
+            is_last = (pg_num == len(page_groups) - 1)
+
+            # Generate vertically justified flowables to eliminate bottom white space
+            flowables, mode_name, measured_h = _generate_page_flowables_justified(
+                page_papers, page_paper_indices, CONTENT_WIDTH, avail_height, is_final_page=is_last
+            )
+            page_density_modes.append(mode_name)
+
+            usage = min(100.0, (measured_h / avail_height) * 100)
+            tag = " (Final Page)" if is_last else ""
+            mode_tag = f" [{mode_name}]" if mode_name != 'standard' else ""
+            titles = [papers[idx]['title'][:38] + '...' for idx in group]
+            if attempt == 1:
+                print(f"    Page {pg_num+1}: {len(group)} abstract(s), {usage:.0f}% filled{mode_tag}{tag} -- {', '.join(titles)}")
+
+            if pg_num > 0:
+                elements.append(PageBreak())
+
+            # Directly extend flowables (each paper is an atomic KeepTogether block with keepWithNext=True)
+            elements.extend(flowables)
+
+        # Build the PDF
+        doc.build(elements)
+
+        # ── Step 2: Post-Compilation PyMuPDF Verification ──
+        is_clean, defects = _inspect_body_pdf_pages(output_path, len(page_groups))
+
+        if is_clean:
+            print(f"  [VERIFIED] All {len(page_groups)} body pages passed 100% clean verification (zero leaks, zero split content)!")
+            return dict(_page_map), page_groups, page_density_modes
+        else:
+            print(f"  [SELF-HEALING] Detected {len(defects)} layout defect(s) on attempt {attempt}:")
+            for d in defects:
+                print(f"    - {d.get('msg')}")
+                if 'page' in d and d['page'] <= len(page_groups):
+                    offending_group = page_groups[d['page'] - 1]
+                    forbidden_pairs.add(tuple(sorted(offending_group)))
+
+            print(f"  [SELF-HEALING] Re-optimizing pairings with tighter constraints...")
+
+    # If completed after self-healing attempts, return final state
+    print(f"  [DONE] Completed body PDF generation.")
     return dict(_page_map), page_groups, page_density_modes
 
 

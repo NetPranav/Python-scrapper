@@ -334,7 +334,7 @@ def create_ieee_test_pdf(filename, data):
 
 def main():
     # Parse count and output folder
-    count = 30
+    count = 80
     target_folder = "IncompletePDF"
 
     if len(sys.argv) > 1:
