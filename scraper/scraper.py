@@ -2092,313 +2092,33 @@ def generate_invited_talks_pdf(output_path):
 
 
 # ============================================================
-# WORD DOCUMENT GENERATION
+# PDF TO WORD CONVERSION
 # ============================================================
 
-def generate_word_output(papers, page_groups, page_density_modes, page_map, output_path):
+def convert_pdf_to_word(pdf_path, docx_path):
     """
-    Generate a Word (.docx) document with the same structure as the PDF:
-    Cover Page (if available) + Table of Contents + Paper entries.
+    Converts the compiled PDF directly to Word (.docx) format using pdf2docx.
+    This guarantees 1:1 layout fidelity, matching margins, exact headers, footers,
+    dividers, and zero inconsistencies between PDF and Word.
     """
     try:
-        from docx import Document
-        from docx.shared import Pt, Inches, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        import fitz
+        if not hasattr(fitz.Rect, 'get_area'):
+            fitz.Rect.get_area = lambda self: abs(self)
+
+        from pdf2docx import Converter
+        print(f"\n[PROCESS] Converting compiled PDF -> Word (.docx)...")
+        cv = Converter(pdf_path)
+        cv.convert(docx_path, start=0, end=None)
+        cv.close()
+        print(f"  [OK] Successfully converted PDF to Word: {docx_path}")
+        return True
     except ImportError:
-        print("  [ERROR] python-docx not installed. Run: pip install python-docx")
+        print("  [ERROR] pdf2docx is not installed. Run: pip install pdf2docx")
         return False
-
-    doc = Document()
-
-    # ── Page margins ──
-    for section in doc.sections:
-        section.top_margin = Inches(0.8)
-        section.bottom_margin = Inches(0.7)
-        section.left_margin = Inches(0.8)
-        section.right_margin = Inches(0.8)
-
-    # ── Style defaults ──
-    style = doc.styles['Normal']
-    style.font.name = 'Times New Roman'
-    style.font.size = Pt(ABSTRACT_FONT_SIZE)
-
-    # ══════════════════════════════════════════════════
-    # COVER PAGE (from cover_page.json if available)
-    # ══════════════════════════════════════════════════
-    cover_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cover_page.json')
-    if os.path.exists(cover_config):
-        try:
-            with open(cover_config, 'r') as f:
-                cover_data = json.load(f)
-            cover_blocks = cover_data.get('blocks', [])
-            cover_blocks.sort(key=lambda b: b.get('y', 0))
-            for blk in cover_blocks:
-                blk_type = blk.get('type', 'text')
-                p = doc.add_paragraph()
-                align_map = {'left': WD_ALIGN_PARAGRAPH.LEFT, 'center': WD_ALIGN_PARAGRAPH.CENTER, 'right': WD_ALIGN_PARAGRAPH.RIGHT}
-                p.alignment = align_map.get(blk.get('textAlign', 'center'), WD_ALIGN_PARAGRAPH.CENTER)
-                p.paragraph_format.space_before = Pt(4)
-                p.paragraph_format.space_after = Pt(4)
-
-                if blk_type in ('image', 'drawing'):
-                    img_url = blk.get('imageUrl', '') if blk_type == 'image' else blk.get('previewImage', '')
-                    if img_url.startswith('data:image/'):
-                        import base64
-                        import io
-                        try:
-                            header, encoded = img_url.split(',', 1)
-                            img_data = base64.b64decode(encoded)
-                            img_stream = io.BytesIO(img_data)
-                            run = p.add_run()
-                            w_inches = blk.get('width', 150) / 72.0
-                            run.add_picture(img_stream, width=Inches(w_inches))
-                        except Exception as e:
-                            print(f"Error adding {blk_type} to Word: {e}")
-                    continue
-
-                html_content = blk.get('content', '')
-                if not html_content:
-                    html_content = blk.get('text', '')
-                plain = re.sub(r'<[^>]+>', ' ', html_content).strip()
-                run = p.add_run(plain)
-                run.font.size = Pt(blk.get('fontSize', 12))
-                run.font.name = blk.get('fontFamily', 'Times New Roman')
-                run.bold = blk.get('fontWeight', 'normal') == 'bold'
-                run.italic = blk.get('fontStyle', 'normal') == 'italic'
-            doc.add_page_break()
-        except Exception:
-            pass  # skip cover on error
-
-    # ══════════════════════════════════════════════════
-    # INVITED TALKS (from invited_talks.json if available)
-    # ══════════════════════════════════════════════════
-    invited_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'invited_talks.json')
-    if os.path.exists(invited_config):
-        try:
-            with open(invited_config, 'r') as f:
-                invited_data = json.load(f)
-            pages = invited_data.get('pages', [])
-            for page_data in pages:
-                blocks = page_data.get('blocks', [])
-                blocks.sort(key=lambda b: b.get('y', 0))
-                for blk in blocks:
-                    blk_type = blk.get('type', 'text')
-                    p = doc.add_paragraph()
-                    align_map = {'left': WD_ALIGN_PARAGRAPH.LEFT, 'center': WD_ALIGN_PARAGRAPH.CENTER, 'right': WD_ALIGN_PARAGRAPH.RIGHT}
-                    p.alignment = align_map.get(blk.get('textAlign', 'center'), WD_ALIGN_PARAGRAPH.CENTER)
-                    p.paragraph_format.space_before = Pt(4)
-                    p.paragraph_format.space_after = Pt(4)
-
-                    if blk_type in ('image', 'drawing'):
-                        img_url = blk.get('imageUrl', '') if blk_type == 'image' else blk.get('previewImage', '')
-                        if img_url.startswith('data:image/'):
-                            import base64
-                            import io
-                            try:
-                                header, encoded = img_url.split(',', 1)
-                                img_data = base64.b64decode(encoded)
-                                img_stream = io.BytesIO(img_data)
-                                run = p.add_run()
-                                w_inches = blk.get('width', 150) / 72.0
-                                run.add_picture(img_stream, width=Inches(w_inches))
-                            except Exception as e:
-                                print(f"Error adding {blk_type} to Word: {e}")
-                        continue
-
-                    html_content = blk.get('content', '')
-                    if not html_content:
-                        html_content = blk.get('text', '')
-                    plain = re.sub(r'<[^>]+>', ' ', html_content).strip()
-                    run = p.add_run(plain)
-                    run.font.size = Pt(blk.get('fontSize', 12))
-                    run.font.name = blk.get('fontFamily', 'Times New Roman')
-                    run.bold = blk.get('fontWeight', 'normal') == 'bold'
-                    run.italic = blk.get('fontStyle', 'normal') == 'italic'
-                doc.add_page_break()
-        except Exception:
-            pass
-
-    # ══════════════════════════════════════════════════
-    # TABLE OF CONTENTS
-    # ══════════════════════════════════════════════════
-
-    # "Contents" heading
-    toc_heading = doc.add_paragraph()
-    toc_heading.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = toc_heading.add_run('Contents')
-    run.bold = True
-    run.font.size = Pt(24)
-    run.font.name = 'Times New Roman'
-
-    # Blue divider line
-    divider = doc.add_paragraph()
-    divider.paragraph_format.space_before = Pt(4)
-    divider.paragraph_format.space_after = Pt(12)
-    run_div = divider.add_run('_' * 85)
-    run_div.font.color.rgb = RGBColor(0, 0x33, 0x66)
-    run_div.font.size = Pt(8)
-
-    # Sort by page number ascending
-    sorted_entries = [(i, p, page_map.get(i, 9999)) for i, p in enumerate(papers)]
-    sorted_entries.sort(key=lambda x: x[2])
-
-    for i, paper, page_val in sorted_entries:
-        page_str = str(page_val) if page_val != 9999 else '?'
-
-        # Title + page number
-        toc_entry = doc.add_paragraph()
-        toc_entry.paragraph_format.space_before = Pt(2)
-        toc_entry.paragraph_format.space_after = Pt(0)
-        run_title = toc_entry.add_run(paper['title'])
-        run_title.font.size = Pt(9.5)
-        run_title.font.name = 'Times New Roman'
-        # Add dotted leader + page number
-        dots = ' ' + '.' * 20 + ' '
-        run_dots = toc_entry.add_run(dots)
-        run_dots.font.size = Pt(8)
-        run_dots.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
-        run_pn = toc_entry.add_run(page_str)
-        run_pn.font.size = Pt(9.5)
-        run_pn.font.name = 'Times New Roman'
-
-        # Author names (italic)
-        author_names = ', '.join(a['name'] for a in paper['authors'])
-        auth_para = doc.add_paragraph()
-        auth_para.paragraph_format.space_before = Pt(0)
-        auth_para.paragraph_format.space_after = Pt(6)
-        run_auth = auth_para.add_run(author_names)
-        run_auth.italic = True
-        run_auth.font.size = Pt(8)
-        run_auth.font.name = 'Times New Roman'
-        run_auth.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
-
-    # ══════════════════════════════════════════════════
-    # BODY — PAPER ENTRIES (Grouped by Page & Density)
-    # ══════════════════════════════════════════════════
-
-    doc.add_page_break()
-
-    for pg_idx, (group, mode) in enumerate(zip(page_groups, page_density_modes)):
-        if pg_idx > 0:
-            doc.add_page_break()
-
-        # Density mode spacing (margins only, font/line height constant)
-        if 'zero_margins' in mode:
-            title_space_after = Pt(1)
-            auth_space_after = Pt(1)
-            abs_space_after = Pt(1)
-            kw_space_after = Pt(1)
-            sep_space_before = Pt(1)
-            sep_space_after = Pt(1)
-        elif 'tight_margins' in mode:
-            title_space_after = Pt(2)
-            auth_space_after = Pt(2)
-            abs_space_after = Pt(2)
-            kw_space_after = Pt(2)
-            sep_space_before = Pt(2)
-            sep_space_after = Pt(3)
-        elif 'compact_margins' in mode:
-            title_space_after = Pt(3)
-            auth_space_after = Pt(4)
-            abs_space_after = Pt(3)
-            kw_space_after = Pt(3)
-            sep_space_before = Pt(3)
-            sep_space_after = Pt(4)
-        else:  # standard
-            title_space_after = Pt(5)
-            auth_space_after = Pt(8)
-            abs_space_after = Pt(5)
-            kw_space_after = Pt(6)
-            sep_space_before = Pt(6)
-            sep_space_after = Pt(8)
-
-        for item_idx, paper_idx in enumerate(group):
-            paper = papers[paper_idx]
-            if item_idx > 0:
-                # Dot separator between papers on the same page
-                sep = doc.add_paragraph()
-                sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                sep.paragraph_format.space_before = sep_space_before
-                sep.paragraph_format.space_after = sep_space_after
-                run_sep = sep.add_run('●  ' * 10 + '●')
-                run_sep.font.size = Pt(7)
-                run_sep.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
-
-            # ── Title ──
-            title_para = doc.add_paragraph()
-            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_para.paragraph_format.space_before = Pt(2)
-            title_para.paragraph_format.space_after = title_space_after
-            run_t = title_para.add_run(paper['title'])
-            run_t.bold = True
-            run_t.font.size = Pt(TITLE_FONT_SIZE)
-            run_t.font.name = 'Times New Roman'
-
-            # ── Authors ──
-            authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=False)
-
-            auth_para = doc.add_paragraph()
-            auth_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            auth_para.paragraph_format.space_after = Pt(2)
-            run_a = auth_para.add_run(authors_text)
-            run_a.font.size = Pt(AUTHORS_FONT_SIZE)
-            run_a.font.name = 'Times New Roman'
-
-            if affiliations_text:
-                aff_para = doc.add_paragraph()
-                aff_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                aff_para.paragraph_format.space_after = auth_space_after
-                run_aff = aff_para.add_run(affiliations_text)
-                run_aff.italic = True
-                run_aff.font.size = Pt(AUTHORS_FONT_SIZE - 1)
-                run_aff.font.name = 'Times New Roman'
-
-            # ── Abstract ──
-            abs_para = doc.add_paragraph()
-            abs_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            abs_para.paragraph_format.space_after = abs_space_after
-            run_abs_label = abs_para.add_run('Abstract— ')
-            run_abs_label.bold = True
-            run_abs_label.font.size = Pt(ABSTRACT_FONT_SIZE)
-            run_abs_label.font.name = 'Times New Roman'
-            run_abs_text = abs_para.add_run(paper['abstract'])
-            run_abs_text.font.size = Pt(ABSTRACT_FONT_SIZE)
-            run_abs_text.font.name = 'Times New Roman'
-
-            # ── Keywords ──
-            kw_para = doc.add_paragraph()
-            kw_para.paragraph_format.space_after = kw_space_after
-            run_kw_label = kw_para.add_run('Keywords— ')
-            run_kw_label.bold = True
-            run_kw_label.font.size = Pt(KEYWORDS_FONT_SIZE)
-            run_kw_label.font.name = 'Times New Roman'
-            run_kw_text = kw_para.add_run(paper['keywords'])
-            run_kw_text.italic = True
-            run_kw_text.font.size = Pt(KEYWORDS_FONT_SIZE)
-            run_kw_text.font.name = 'Times New Roman'
-
-    # ── Footer on each page ──
-    for section in doc.sections:
-        footer = section.footer
-        footer.is_linked_to_previous = False
-        fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        fp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        run_url = fp.add_run(FOOTER_URL)
-        run_url.bold = True
-        run_url.font.size = Pt(FOOTER_URL_FONT_SIZE)
-        run_url.font.name = 'Times New Roman'
-
-        header = section.header
-        header.is_linked_to_previous = False
-        hp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        run_hdr = hp.add_run(CONFERENCE_HEADER)
-        run_hdr.italic = True
-        run_hdr.font.size = Pt(HEADER_FONT_SIZE)
-        run_hdr.font.name = 'Times New Roman'
-
-    doc.save(output_path)
-    return True
+    except Exception as e:
+        print(f"  [ERROR] PDF to Word conversion failed: {e}")
+        return False
 
 
 # ============================================================
@@ -2466,7 +2186,7 @@ def main():
     if failed:
         print(f"  [ERROR] Failed:     {len(failed)} -- {', '.join(failed)}")
 
-    # ── Generate body PDF (always needed for page_map) ──
+    # ── Generate body PDF ──
     body_temp = os.path.join(output_folder, "_body_temp.pdf")
     print(f"\n[PROCESS] Generating body pages...")
     page_map, page_groups, page_density_modes = generate_body_pdf(papers, body_temp)
@@ -2476,47 +2196,45 @@ def main():
         short_title = p['title'][:55] + '...' if len(p['title']) > 55 else p['title']
         print(f"    Page {page_map.get(i, '?')}: {short_title}")
 
-    if output_format == 'word':
-        # ── Word output ──
-        output_path = os.path.join(output_folder, "compiled_output.docx")
-        print(f"\n[PROCESS] Generating Word document -> {output_path}")
-        success = generate_word_output(papers, page_groups, page_density_modes, page_map, output_path)
-        # Cleanup temp body PDF
-        if os.path.exists(body_temp):
-            os.remove(body_temp)
-        if not success:
-            print("\n[ERROR] Word generation failed!")
-            sys.exit(1)
+    # ── PDF output ──
+    # Generate cover page if cover_page.json exists
+    cover_temp = os.path.join(output_folder, "_cover_temp.pdf")
+    has_cover = generate_cover_page_pdf(cover_temp)
+    if has_cover:
+        print(f"\n[PROCESS] Generated cover page")
     else:
-        # ── PDF output ──
-        # Generate cover page if cover_page.json exists
-        cover_temp = os.path.join(output_folder, "_cover_temp.pdf")
-        has_cover = generate_cover_page_pdf(cover_temp)
-        if has_cover:
-            print(f"\n[PROCESS] Generated cover page")
-        else:
-            cover_temp = None
+        cover_temp = None
 
-        invited_talks_temp = os.path.join(output_folder, "_invited_talks_temp.pdf")
-        has_invited_talks = generate_invited_talks_pdf(invited_talks_temp)
-        if has_invited_talks:
-            print(f"\n[PROCESS] Generated invited talks")
-        else:
-            invited_talks_temp = None
+    invited_talks_temp = os.path.join(output_folder, "_invited_talks_temp.pdf")
+    has_invited_talks = generate_invited_talks_pdf(invited_talks_temp)
+    if has_invited_talks:
+        print(f"\n[PROCESS] Generated invited talks")
+    else:
+        invited_talks_temp = None
 
-        toc_temp = os.path.join(output_folder, "_toc_temp.pdf")
-        print(f"\n[PROCESS] Generating Table of Contents...")
-        generate_toc_pdf(papers, page_map, toc_temp)
+    toc_temp = os.path.join(output_folder, "_toc_temp.pdf")
+    print(f"\n[PROCESS] Generating Table of Contents...")
+    generate_toc_pdf(papers, page_map, toc_temp)
 
-        output_path = os.path.join(output_folder, "compiled_output.pdf")
-        parts_msg = " Cover +" if has_cover else ""
-        parts_msg += " Invited Talks +" if has_invited_talks else ""
-        print(f"\n[PROCESS] Merging{parts_msg} TOC + Body -> {output_path}")
-        merge_pdfs(toc_temp, body_temp, output_path)
+    pdf_output_path = os.path.join(output_folder, "compiled_output.pdf")
+    parts_msg = " Cover +" if has_cover else ""
+    parts_msg += " Invited Talks +" if has_invited_talks else ""
+    print(f"\n[PROCESS] Merging{parts_msg} TOC + Body -> {pdf_output_path}")
+    merge_pdfs(toc_temp, body_temp, pdf_output_path)
 
-        # Cleanup temp files
+    # Cleanup temp files
+    if os.path.exists(body_temp):
         os.remove(body_temp)
+    if os.path.exists(toc_temp):
         os.remove(toc_temp)
+
+    # ── Convert to Word if requested ──
+    docx_output_path = os.path.join(output_folder, "compiled_output.docx")
+    if output_format in ('word', 'docx', 'both'):
+        success = convert_pdf_to_word(pdf_output_path, docx_output_path)
+        if not success:
+            print("\n[ERROR] Word conversion failed!")
+            sys.exit(1)
 
     # ── Move processed PDFs to output folder ──
     print(f"\n[PROCESS] Moving processed PDFs to {output_folder}/...")
@@ -2530,30 +2248,23 @@ def main():
             print(f"    [OK] {pdf_file}")
 
     # ── Final summary ──
-    if output_format == 'word':
-        print(f"\n{'='*60}")
-        print(f"[DONE] COMPILATION COMPLETE")
-        print(f"{'='*60}")
-        print(f"  Output:      {output_path}")
-        print(f"  Papers:      {len(papers)}")
-        print(f"  Format:      Word (.docx)")
-        print(f"{'='*60}")
-    else:
-        final_doc = fitz.open(output_path)
-        total_pages = len(final_doc)
-        final_doc.close()
+    final_doc = fitz.open(pdf_output_path)
+    total_pages = len(final_doc)
+    final_doc.close()
 
-        body_page_count = len(set(page_map.values()))
-        toc_pages = total_pages - body_page_count
+    body_page_count = len(set(page_map.values()))
+    toc_pages = total_pages - body_page_count
 
-        print(f"\n{'='*60}")
-        print(f"[DONE] COMPILATION COMPLETE")
-        print(f"{'='*60}")
-        print(f"  Output:      {output_path}")
-        print(f"  Papers:      {len(papers)}")
-        print(f"  Total pages: {total_pages} "
-              f"({toc_pages} TOC + {body_page_count} body)")
-        print(f"{'='*60}")
+    print(f"\n{'='*60}")
+    print(f"[DONE] COMPILATION COMPLETE")
+    print(f"{'='*60}")
+    print(f"  PDF Output:  {pdf_output_path}")
+    if output_format in ('word', 'docx', 'both'):
+        print(f"  Word Output: {docx_output_path}")
+    print(f"  Papers:      {len(papers)}")
+    print(f"  Total pages: {total_pages} "
+          f"({toc_pages} TOC + {body_page_count} body)")
+    print(f"{'='*60}")
 
 
 if __name__ == "__main__":

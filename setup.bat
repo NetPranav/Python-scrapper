@@ -43,7 +43,7 @@ if %errorlevel% neq 0 (
 )
 
 python -m pip install --upgrade pip >nul 2>&1
-python -m pip install PyMuPDF reportlab python-docx
+python -m pip install PyMuPDF reportlab python-docx pdf2docx
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install Python dependencies.
     pause
