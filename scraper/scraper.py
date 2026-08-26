@@ -117,6 +117,10 @@ CONTENT_WIDTH = PAGE_WIDTH - LEFT_MARGIN - RIGHT_MARGIN
 
 # Strict limit: max papers per page
 MAX_PAPERS_PER_PAGE = 2
+# Non-final pages must use at least this fraction of available height (max 80% whitespace)
+MIN_PAGE_FILL_RATIO = 0.20
+# Conservative headroom so KeepTogether blocks never overflow the frame
+PACKING_HEADROOM_PT = 85.0
 
 # ────────────────────────────────────────────────────────────
 # TUNABLE SPACING PARAMETERS  (adjust these to control layout)
@@ -259,6 +263,213 @@ def smart_join_parts(parts):
     return re.sub(r'\s+', ' ', result).strip()
 
 
+INSTITUTION_RE = re.compile(
+    r'\b(?:department|dept\.?|university|institute|college|school|faculty|academy|'
+    r'center|centre|engineering|technology|campus|vidyapeetham|deemed|laboratory|'
+    r'division|vet\.?|inst\.?|global|alliance|symbiosis|medicaps|medicaps|vishwa|'
+    r'lovely|saveetha|jain|atlas|vivekananda|acropolis|manipal|sage|ggits|skitm)\b',
+    re.I,
+)
+
+JOB_TITLE_RE = re.compile(
+    r'\b(?:professor|head|research\s+scholar|scholar|dean|director|lecturer|'
+    r'associate|assistant|scientist|fellow|independent\s+researcher|ugdx|coe|'
+    r'hod|chairperson|coordinator)\b',
+    re.I,
+)
+
+INSTITUTION_FRAGMENT_RE = re.compile(
+    r'^(?:university|institute|college|department|school|apex|symbiosis|chandigarh|'
+    r'csa|itm|engineering|technology|\)|\(deemed|\(deemed-to-be)\b',
+    re.I,
+)
+
+
+def clean_author_name(name: str) -> str:
+    """Strip superscript affiliation markers from author names."""
+    name = re.sub(r'[\d*†‡§¶\[\]]+$', '', name).strip()
+    name = re.sub(r'^[\d*†‡§¶\[\]]+\s*', '', name).strip()
+    name = re.sub(r'(\w)[\d*†‡§¶]+(?=\s|,|$)', r'\1', name).strip()
+    return name
+
+
+def is_affiliation_text(text, is_italic=False):
+    """Detect department/college/job-title lines (never author names)."""
+    t = text.strip()
+    if not t:
+        return False
+    if is_italic:
+        return True
+    if INSTITUTION_RE.search(t):
+        return True
+    if JOB_TITLE_RE.search(t):
+        return True
+    if INSTITUTION_FRAGMENT_RE.match(t):
+        return True
+    if re.search(r'\b(?:&|and)\s+head\b', t, re.I):
+        return True
+    return False
+
+
+def is_person_name(text):
+    """Heuristic for real author names (not institutions or titles)."""
+    t = clean_author_name(text.strip())
+    if not t or len(t) < 2 or len(t) > 70:
+        return False
+    if not re.search(r'[A-Za-z]', t):
+        return False
+    if is_email(t) or is_location_line(t) or is_copyright(t):
+        return False
+    if is_affiliation_text(t):
+        return False
+    if re.match(r'^[A-Z]\.?$', t):
+        return False
+    if re.match(r'^[\d\s\W]+$', t):
+        return False
+    words = t.split()
+    if len(words) == 1 and len(words[0]) <= 2:
+        return False
+    return True
+
+
+def _cluster_spans_by_column(section_spans, x_gap=90):
+    """Group author-section spans into vertical columns (multi-column PDF layouts)."""
+    valid = [s for s in section_spans if s['text'].strip()]
+    if not valid:
+        return []
+
+    sorted_spans = sorted(valid, key=lambda s: (s.get('origin_x', 0), s['origin_y']))
+    columns = [[sorted_spans[0]]]
+    for s in sorted_spans[1:]:
+        col_x = sum(item.get('origin_x', 0) for item in columns[-1]) / len(columns[-1])
+        if abs(s.get('origin_x', 0) - col_x) < x_gap:
+            columns[-1].append(s)
+        else:
+            columns.append([s])
+
+    for col in columns:
+        col.sort(key=lambda s: s['origin_y'])
+    columns.sort(key=lambda col: min(s.get('origin_x', 0) for s in col))
+    return columns
+
+
+def _parse_author_column(col_spans):
+    """Parse one author column/block into name + affiliation + optional superscript."""
+    name = None
+    college_parts = []
+    affil_num = None
+
+    i = 0
+    while i < len(col_spans):
+        s = col_spans[i]
+        text = s['text'].strip()
+        if not text:
+            i += 1
+            continue
+
+        if s['is_super'] or re.match(r'^[\d\[\]]+$', text):
+            if name and affil_num is None:
+                affil_num = re.sub(r'[\[\]\s]', '', text)
+            i += 1
+            continue
+
+        if name is None and is_person_name(text):
+            name = clean_author_name(text)
+            if i + 1 < len(col_spans):
+                ns = col_spans[i + 1]
+                nt = ns['text'].strip()
+                if nt and (
+                    ns['is_super']
+                    or (abs(ns['origin_y'] - s['origin_y']) < 4 and re.match(r'^[\d\[\]]+$', nt))
+                ):
+                    affil_num = re.sub(r'[\[\]\s]', '', nt)
+                    i += 2
+                    continue
+            i += 1
+            continue
+
+        if name is not None and (s['is_italic'] or is_affiliation_text(text, s['is_italic'])):
+            college_parts.append(text)
+            i += 1
+            continue
+
+        if name is not None and not is_person_name(text):
+            # Non-italic affiliation lines (common in some IEEE templates)
+            college_parts.append(text)
+            i += 1
+            continue
+
+        i += 1
+
+    if not name:
+        return None
+
+    author = {
+        'name': name,
+        'college': smart_join_parts(college_parts),
+    }
+    if affil_num:
+        author['affil_num'] = affil_num
+    return author
+
+
+def _extract_authors_spatial(section_spans):
+    """
+    Extract authors using spatial column clustering so multi-column
+    author blocks are parsed name-by-name instead of interleaved.
+    """
+    filtered = []
+    for s in section_spans:
+        text = s['text'].strip()
+        if not text:
+            continue
+        if is_copyright(text) or is_email(text) or is_location_line(text):
+            continue
+        filtered.append(s)
+
+    if not filtered:
+        return []
+
+    x_values = [s.get('origin_x', 0) for s in filtered]
+    x_spread = max(x_values) - min(x_values) if x_values else 0
+
+    authors = []
+
+    if x_spread > 120:
+        for col in _cluster_spans_by_column(filtered):
+            author = _parse_author_column(col)
+            if author:
+                authors.append(author)
+    else:
+        # Single-column stacked authors: split when a new person name appears
+        ordered = sorted(filtered, key=lambda s: (s['origin_y'], s.get('origin_x', 0)))
+        current_col = []
+        for s in ordered:
+            text = s['text'].strip()
+            if is_person_name(text) and current_col:
+                prev = _parse_author_column(current_col)
+                if prev:
+                    authors.append(prev)
+                current_col = [s]
+            else:
+                current_col.append(s)
+        if current_col:
+            prev = _parse_author_column(current_col)
+            if prev:
+                authors.append(prev)
+
+    # Deduplicate identical name+college pairs from overlapping columns
+    seen = set()
+    unique = []
+    for a in authors:
+        key = (a['name'].lower(), a.get('college', '').lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(a)
+    return unique
+
+
 # ============================================================
 # PDF SCRAPING
 # ============================================================
@@ -318,6 +529,7 @@ def extract_paper_data(pdf_path):
                     'is_bold': bool(span['flags'] & 16),
                     'is_italic': bool(span['flags'] & 2),
                     'is_super': bool(span['flags'] & 1),
+                    'origin_x': round(span['origin'][0], 1) if 'origin' in span else 0,
                     'origin_y': round(span['origin'][1], 1) if 'origin' in span else 0,
                 })
 
@@ -397,72 +609,13 @@ def extract_paper_data(pdf_path):
             break
 
     # ════════════════════════════════════════════════
-    # STEP 3: EXTRACT AUTHORS + COLLEGE
+    # STEP 3: EXTRACT AUTHORS + COLLEGE (spatial parsing)
     # ════════════════════════════════════════════════
-
-    def clean_author_name(name: str) -> str:
-        """Strip superscript affiliation markers (^1, ^2, *, †, etc.) from author names."""
-        # Remove trailing superscript markers: digits, *, †, ‡, §, ¶
-        name = re.sub(r'[\d*†‡§¶]+$', '', name).strip()
-        # Remove leading superscript markers (rare but possible)
-        name = re.sub(r'^[\d*†‡§¶]+\s*', '', name).strip()
-        # Remove markers attached after a comma (e.g. "Name1, Name2")
-        name = re.sub(r'(\w)[\d*†‡§¶]+', r'\1', name).strip()
-        return name
 
     authors = []
     if abstract_idx is not None:
         section = spans[last_title_idx + 1: abstract_idx]
-
-        current_name = None
-        current_college_parts = []
-
-        for s in section:
-            text = s['text'].strip()
-
-            # ── Skip non-relevant spans ──
-            if not text:
-                continue
-            if s['is_super']:          # superscript affiliation numbers
-                continue
-            # Skip spans that are ONLY digits/symbols (standalone affiliation markers)
-            if re.match(r'^[\d*†‡§¶,\s]+$', text):
-                continue
-            if is_copyright(text):     # "978-1-... ©2025 IEEE"
-                continue
-            if is_email(text):         # "name@domain.com"
-                continue
-            if is_location_line(text): # "Indore, India"
-                continue
-
-            if s['is_italic']:
-                # ── ITALIC = College / Institution info ──
-                current_college_parts.append(text)
-            else:
-                # ── NON-ITALIC = Potential author name ──
-                # Validate: must contain letters, reasonable length
-                if re.search(r'[A-Za-z]', text) and len(text) > 1:
-                    # Clean any inline superscript markers from name
-                    cleaned = clean_author_name(text)
-                    if not cleaned or len(cleaned) < 2:
-                        continue
-                    # Save the previous author before starting new one
-                    if current_name is not None:
-                        college = smart_join_parts(current_college_parts)
-                        authors.append({
-                            'name': current_name,
-                            'college': college
-                        })
-                        current_college_parts = []
-                    current_name = cleaned
-
-        # Save the last author
-        if current_name is not None:
-            college = smart_join_parts(current_college_parts)
-            authors.append({
-                'name': current_name,
-                'college': college
-            })
+        authors = _extract_authors_spatial(section)
 
     if authors:
         for a in authors:
@@ -639,40 +792,49 @@ def format_authors_with_affiliations(authors, use_html_super=True):
     """
     Format authors with superscript affiliation numbers.
 
+    Line 1: names only with superscripts (when multiple affiliations exist).
+    Line 2: numbered affiliations (department/college), never job titles as authors.
+
     Returns:
         (authors_line, affiliations_line)
-
-    If use_html_super=True:
-        authors_line uses ReportLab <super> tags for PDF rendering.
-    If use_html_super=False:
-        authors_line uses Unicode superscript characters (for plain text / TOC / Word).
-
-    Example output:
-        authors_line:  "John Doe¹, Jane Smith², Bob Lee¹"
-        affiliations_line:  "¹MIT, ²Stanford"
     """
     if not authors:
         return '', ''
 
-    # Build a unique list of colleges, mapping each author to a number
+    # Drop empty-name entries; keep only valid author records
+    authors = [a for a in authors if a.get('name', '').strip()]
+    if not authors:
+        return '', ''
+
+    # Build unique affiliations preserving first-seen order
     college_to_num = {}
-    college_list = []  # ordered unique colleges
-    author_nums = []   # which number each author gets
+    college_list = []
+    author_nums = []
 
     for a in authors:
         college = a.get('college', '').strip()
+        pdf_num = a.get('affil_num')
+        if pdf_num and str(pdf_num).isdigit():
+            num = int(pdf_num)
+            if college and college not in college_to_num:
+                college_to_num[college] = num
+                while len(college_list) < num:
+                    college_list.append('')
+                college_list[num - 1] = college
+            author_nums.append(num)
+            continue
+
         if not college:
-            college = ''
+            author_nums.append(None)
+            continue
         if college not in college_to_num:
-            num = len(college_list) + 1
-            college_to_num[college] = num
+            college_to_num[college] = len(college_list) + 1
             college_list.append(college)
         author_nums.append(college_to_num[college])
 
-    # If all authors share the same college, no need for superscripts
+    college_list = [c for c in college_list if c]
     all_same = len(college_list) <= 1
 
-    # Build the authors line
     author_parts = []
     for i, a in enumerate(authors):
         name_safe = html_escape(a['name'])
@@ -680,16 +842,16 @@ def format_authors_with_affiliations(authors, use_html_super=True):
             author_parts.append(name_safe)
         else:
             num = author_nums[i]
-            if use_html_super:
+            if num is None:
+                author_parts.append(name_safe)
+            elif use_html_super:
                 author_parts.append(f"{name_safe}<super>{num}</super>")
             else:
                 sup = _SUPERSCRIPT_DIGITS.get(num, str(num))
                 author_parts.append(f"{name_safe}{sup}")
     authors_line = ', '.join(author_parts)
 
-    # Build the affiliations line
     if all_same and college_list:
-        # Single college — just show it centered, no number
         affiliations_line = html_escape(college_list[0])
     elif college_list:
         aff_parts = []
@@ -920,48 +1082,44 @@ def _precompute_paper_heights(papers, avail_width):
 
 def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None):
     """
-    Combinatorial Re-Ordering & Bin Packing Optimization Engine:
-    
-    Primary Rules:
-      1. Default target: MATCH EXACTLY 2 ABSTRACTS PER PAGE.
-      2. If 2 abstracts already fill >= 75% of the page, that page is complete!
-      3. A 3rd abstract is allowed ONLY if the first 2 abstracts are short (filling < 75%)
-         AND the 3rd abstract fits within the safe budget without risk of overflow.
-      4. Maximum 3 abstracts per page (NEVER 4).
-      5. Strict 50pt safe headroom to eliminate overflow risks.
-      6. Global Simulated Annealing finds the optimal pairings across all papers.
+    Bin-packing engine for abstract pages.
+
+    Strategy: Tallest-first, shortest-partner matching.
+    Big papers always get paired with the shortest available paper FIRST,
+    so small papers are never wasted by pairing two smalls together
+    while a big paper sits alone.
+
+    Rules:
+      1. At most MAX_PAPERS_PER_PAGE (2) abstracts per page.
+      2. Every non-final page must have 2 abstracts (unless truly oversized).
+      3. Non-final pages must fill at least MIN_PAGE_FILL_RATIO of height.
+      4. Last page may contain a single leftover abstract (any whitespace OK).
+      5. Conservative headroom prevents KeepTogether overflow / keyword leaks.
+      6. Only papers that cannot fit with the SHORTEST available paper
+         are allowed solo pages.
     """
     n = len(papers)
     if n == 0:
         return []
     if n == 1:
         return [(0,)]
-    if n == 2:
-        return [(0, 1)]
 
     if forbidden_pairs is None:
         forbidden_pairs = set()
 
     height_matrix = _precompute_paper_heights(papers, CONTENT_WIDTH)
-    target_budget = avail_height - 50.0  # 661.89pt max for any multi-abstract page
+    target_budget = avail_height - PACKING_HEADROOM_PT
 
     def test_group(grp):
         k = len(grp)
         if k == 0:
             return True, 0.0, 0
-        if k > 3:  # Strictly maximum 3 abstracts per page
+        if k > MAX_PAPERS_PER_PAGE:
             return False, float('inf'), None
 
-        # Check forbidden pairs
         grp_tuple = tuple(sorted(grp))
         if grp_tuple in forbidden_pairs:
             return False, float('inf'), None
-        
-        # If 3 items, only allow if first 2 items are small (< 75% budget)
-        if k == 3:
-            h_first2 = height_matrix[grp[0]][0] + height_matrix[grp[1]][0] + TIER_SPECS[0]['sep_total']
-            if h_first2 >= target_budget * 0.75:
-                return False, float('inf'), None
 
         for t_idx, tier in enumerate(TIER_SPECS):
             h_papers = sum(height_matrix[i][t_idx] for i in grp)
@@ -971,57 +1129,108 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
                 return True, tot, t_idx
         return False, float('inf'), None
 
-    # Sort descending by standard height
-    sorted_items = sorted(range(n), key=lambda i: height_matrix[i][0], reverse=True)
-
-    # 1. Best-Fit Decreasing prioritizing 2 items per bin
+    # ── Phase 1: Tallest-first, shortest-partner greedy matching ──
+    # Sort all papers by their minimum possible height (most compact tier)
+    min_heights = [min(height_matrix[i]) for i in range(n)]
+    
+    # Sort indices: tallest first
+    tall_order = sorted(range(n), key=lambda i: min_heights[i], reverse=True)
+    
+    paired = set()
     bins = []
-    for item in sorted_items:
-        best_b = -1
-        min_slack = float('inf')
-        for b_idx, b in enumerate(bins):
-            if len(b) >= 3:
+    truly_oversized = set()
+    
+    for idx in tall_order:
+        if idx in paired:
+            continue
+        
+        # Find the shortest AVAILABLE partner that fits with this paper
+        # Sort candidates by height ascending (shortest first)
+        candidates = [
+            j for j in range(n)
+            if j != idx and j not in paired
+        ]
+        candidates.sort(key=lambda j: min_heights[j])  # shortest first
+        
+        best_partner = None
+        best_tot = float('inf')
+        best_tier = None
+        
+        for cand in candidates:
+            pair_tuple = tuple(sorted([idx, cand]))
+            if pair_tuple in forbidden_pairs:
                 continue
-            cand = b + [item]
-            fits, tot, _ = test_group(cand)
+            fits, tot, t_idx = test_group([idx, cand])
             if fits:
-                slack = avail_height - tot
-                if slack < min_slack:
-                    min_slack = slack
-                    best_b = b_idx
-        if best_b != -1:
-            bins[best_b].append(item)
-        else:
-            bins.append([item])
-
-    # 2. Repair any single-item bins: pair singles together or merge into bins with 2 items
-    multi_bins = [b for b in bins if len(b) >= 2]
-    single_bins = [b for b in bins if len(b) == 1]
-    unmatched = []
-    for s in single_bins:
-        item = s[0]
-        placed = False
-        for b in multi_bins:
-            if len(b) >= 3:
-                continue
-            cand = b + [item]
-            fits, _, _ = test_group(cand)
-            if fits:
-                b.append(item)
-                placed = True
+                # Pick the partner that gives the tightest fit (least waste)
+                if best_partner is None or tot > best_tot:
+                    # Actually prefer HIGHER fill (less whitespace)
+                    best_partner = cand
+                    best_tot = tot
+                    best_tier = t_idx
+                # But first valid (shortest) partner is already great
+                # Accept first fit for speed, SA will refine later
+                best_partner = cand
+                best_tot = tot
+                best_tier = t_idx
                 break
-        if not placed:
-            unmatched.append(item)
+        
+        if best_partner is not None:
+            bins.append([idx, best_partner])
+            paired.add(idx)
+            paired.add(best_partner)
+        else:
+            # This paper cannot pair with ANY remaining paper
+            truly_oversized.add(idx)
+            bins.append([idx])
+            paired.add(idx)
+    
+    # ── Phase 2: Try to rescue oversized singles by stealing a partner ──
+    # For each truly_oversized paper, check if swapping it with someone
+    # from a paired bin would work better
+    for solo_idx in list(truly_oversized):
+        rescued = False
+        for b_idx, b in enumerate(bins):
+            if len(b) != 2:
+                continue
+            for pos in range(2):
+                partner_in_bin = b[pos]
+                other_in_bin = b[1 - pos]
+                # Can solo_idx pair with partner_in_bin?
+                pair1 = tuple(sorted([solo_idx, partner_in_bin]))
+                if pair1 in forbidden_pairs:
+                    continue
+                fits1, _, _ = test_group([solo_idx, partner_in_bin])
+                if not fits1:
+                    continue
+                # Can other_in_bin pair with anyone else or go solo on last page?
+                # Check if other_in_bin can fit with another solo
+                other_solo_bins = [i for i, bb in enumerate(bins) if len(bb) == 1 and bb[0] != solo_idx]
+                placed_other = False
+                for os_idx in other_solo_bins:
+                    os_paper = bins[os_idx][0]
+                    pair2 = tuple(sorted([other_in_bin, os_paper]))
+                    if pair2 in forbidden_pairs:
+                        continue
+                    fits2, _, _ = test_group([other_in_bin, os_paper])
+                    if fits2:
+                        # Great! Swap: solo_idx takes partner_in_bin's spot,
+                        # other_in_bin joins os_paper
+                        bins[b_idx] = [solo_idx, partner_in_bin]
+                        bins[os_idx] = [other_in_bin, os_paper]
+                        # Remove solo_idx's old solo bin
+                        bins = [bb for bb in bins if not (len(bb) == 1 and bb[0] == solo_idx)]
+                        truly_oversized.discard(solo_idx)
+                        truly_oversized.discard(os_paper)
+                        placed_other = True
+                        rescued = True
+                        break
+                if rescued:
+                    break
+            if rescued:
+                break
 
-    while len(unmatched) >= 2:
-        s1 = unmatched.pop(0)
-        s2 = unmatched.pop(0)
-        multi_bins.append([s1, s2])
-
-    if unmatched:
-        multi_bins.append(unmatched)
-
-    # 3. Fast Simulated Annealing / Local Search with 5000 Iterations
+    # ── Phase 3: Simulated Annealing refinement (5000 iterations) ──
     def score_partition(part):
         sc = 0.0
         valid_bins = [b for b in part if b]
@@ -1029,33 +1238,28 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
         for b_idx, b in enumerate(valid_bins):
             fits, tot, t_idx = test_group(b)
             if not fits:
-                return -1e9  # strictly invalid
+                return -1e9
 
             ratio = min(1.0, tot / avail_height)
             is_last_page = (b_idx == num_bins - 1)
 
-            # RULE: Every non-final page MUST have >= 2 abstracts and >= 75% fill
             if not is_last_page:
                 if len(b) < 2:
-                    return -1e9  # Forbidden: non-final page cannot have 1 abstract
-                if ratio < 0.75:
-                    sc -= 50000.0 * (0.75 - ratio)  # Extreme penalty for under-filled non-final page
+                    if len(b) == 1 and b[0] in truly_oversized:
+                        sc += 100.0  # Acceptable for truly oversized
+                    else:
+                        return -1e9  # Non-final solo page is FORBIDDEN
+                if ratio < MIN_PAGE_FILL_RATIO:
+                    sc -= 50000.0 * (MIN_PAGE_FILL_RATIO - ratio)
 
             if len(b) == 2:
-                if ratio >= 0.75:
-                    sc += 800.0 + (ratio * 300.0)
-                else:
-                    sc += 150.0 + (ratio * 100.0)
-            elif len(b) == 3:
-                if ratio >= 0.78:
-                    sc += 600.0 + (ratio * 250.0)
-                else:
-                    sc += 120.0 + (ratio * 80.0)
+                sc += 800.0 + (ratio * 300.0)
             elif len(b) == 1:
-                # Allowed ONLY on the final page
+                if not is_last_page and b[0] not in truly_oversized:
+                    return -1e9
                 sc += 50.0
 
-            # Bonus for standard generous margins
+            # Prefer standard generous margins
             if t_idx == 0:
                 sc += 60.0
             elif t_idx == 1:
@@ -1064,7 +1268,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
                 sc -= 40.0
         return sc
 
-    best_bins = [list(b) for b in multi_bins]
+    best_bins = [list(b) for b in bins]
     best_score = score_partition(best_bins)
     curr_bins = [list(b) for b in best_bins]
 
@@ -1083,7 +1287,7 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
             c1 = list(b1)
             c2 = list(b2)
             c1[i1], c2[i2] = c2[i2], c1[i1]
-            if len(c1) <= 3 and len(c2) <= 3:
+            if len(c1) <= MAX_PAPERS_PER_PAGE and len(c2) <= MAX_PAPERS_PER_PAGE:
                 f1, _, _ = test_group(c1)
                 f2, _, _ = test_group(c2)
                 if f1 and f2:
@@ -1097,8 +1301,8 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
                         curr_bins = cand_part
                         continue
 
-        # Move 2: Try item transfer from b1 to b2 (merge / dissolve single bins)
-        if len(b1) >= 1 and len(b2) <= 2:
+        # Move 2: Try item transfer from b1 to b2
+        if len(b1) >= 1 and len(b2) <= MAX_PAPERS_PER_PAGE - 1:
             i1 = random.randrange(len(b1))
             c1 = [x for idx, x in enumerate(b1) if idx != i1]
             c2 = b2 + [b1[i1]]
@@ -1115,22 +1319,25 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
                     best_bins = [list(b) for b in cand_part]
                     curr_bins = cand_part
 
-    # Clean empty bins and sort final page groups
+    # ── Final ordering: paired pages first (desc by fill), solos last ──
     clean_bins = [b for b in best_bins if b]
-    
-    # Ensure multi-item bins appear first, single remainder appears strictly last
     multi_groups = [b for b in clean_bins if len(b) >= 2]
     single_groups = [b for b in clean_bins if len(b) == 1]
 
-    # Sort multi-groups descending by fill percentage
     multi_records = []
     for b in multi_groups:
         _, tot, t_idx = test_group(b)
         multi_records.append((tuple(b), tot, t_idx))
     multi_records.sort(key=lambda rec: rec[1], reverse=True)
 
+    # Oversized solos go before the final leftover
+    oversized_singles = [s for s in single_groups if s[0] in truly_oversized]
+    leftover_singles = [s for s in single_groups if s[0] not in truly_oversized]
+
     final_groups = [rec[0] for rec in multi_records]
-    for s in single_groups:
+    for s in oversized_singles:
+        final_groups.append(tuple(s))
+    for s in leftover_singles:
         final_groups.append(tuple(s))
 
     return final_groups
@@ -1482,10 +1689,19 @@ def _word_wrap(text, font_name, font_size, max_width):
 # PDF MERGE
 # ============================================================
 
-def merge_pdfs(toc_path, body_path, output_path):
+def merge_pdfs(toc_path, body_path, output_path, cover_path=None, invited_talks_path=None):
     """Merge Cover (optional) + Messages (optional) + Invited Talks (optional) + Table of Contents + Body into a single final PDF."""
     output_doc = fitz.open()
 
+    if cover_path and os.path.exists(cover_path):
+        cover_doc = fitz.open(cover_path)
+        output_doc.insert_pdf(cover_doc)
+        cover_doc.close()
+
+    if invited_talks_path and os.path.exists(invited_talks_path):
+        talks_doc = fitz.open(invited_talks_path)
+        output_doc.insert_pdf(talks_doc)
+        talks_doc.close()
 
     toc_doc = fitz.open(toc_path)
     body_doc = fitz.open(body_path)
@@ -2219,14 +2435,17 @@ def main():
     pdf_output_path = os.path.join(output_folder, "compiled_output.pdf")
     parts_msg = " Cover +" if has_cover else ""
     parts_msg += " Invited Talks +" if has_invited_talks else ""
-    print(f"\n[PROCESS] Merging{parts_msg} TOC + Body -> {pdf_output_path}")
-    merge_pdfs(toc_temp, body_temp, pdf_output_path)
+    merge_pdfs(toc_temp, body_temp, pdf_output_path, cover_path=cover_temp, invited_talks_path=invited_talks_temp)
 
     # Cleanup temp files
     if os.path.exists(body_temp):
         os.remove(body_temp)
     if os.path.exists(toc_temp):
         os.remove(toc_temp)
+    if cover_temp and os.path.exists(cover_temp):
+        os.remove(cover_temp)
+    if invited_talks_temp and os.path.exists(invited_talks_temp):
+        os.remove(invited_talks_temp)
 
     # ── Convert to Word if requested ──
     docx_output_path = os.path.join(output_folder, "compiled_output.docx")
