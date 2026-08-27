@@ -1554,9 +1554,22 @@ def generate_toc_pdf(papers, page_map, output_path):
     """
     Generate Table of Contents page(s) using direct canvas drawing
     for precise dotted-leader alignment.
+    Returns list of metadata dicts for hyperlink injection:
+    [
+        {
+            'paper_idx': i,
+            'title': paper['title'],
+            'toc_page_idx': current_toc_page,
+            'body_page_num': page_val,
+            'rect_fitz': (x0, y0, x1, y1),
+        },
+        ...
+    ]
     """
     c = canvas_mod.Canvas(output_path, pagesize=A4)
     y = PAGE_HEIGHT - 75
+    current_toc_page = 0
+    toc_entries_meta = []
 
     # ── "Contents" heading ──
     c.setFont("Times-Bold", 24)
@@ -1597,9 +1610,14 @@ def generate_toc_pdf(papers, page_map, output_path):
         if y - entry_height < 50:
             _draw_toc_footer(c)
             c.showPage()
+            current_toc_page += 1
             # Draw header on continuation TOC pages
             _draw_toc_header(c)
             y = PAGE_HEIGHT - 75
+
+        # Record top of entry for hyperlink bounding box
+        entry_toc_page = current_toc_page
+        entry_top_rl = y + toc_title_size + 2.0
 
         # ── Draw title with dotted leaders → page number ──
         for j, line in enumerate(lines):
@@ -1630,10 +1648,27 @@ def generate_toc_pdf(papers, page_map, output_path):
                 c.drawString(LEFT_MARGIN, y, al)
                 y -= 9.5
 
+        # Record bottom of entry and save metadata for hyperlink
+        entry_bottom_rl = y - 2.0
+        fitz_x0 = LEFT_MARGIN - 2.0
+        fitz_x1 = PAGE_WIDTH - RIGHT_MARGIN + 2.0
+        fitz_y0 = max(0.0, PAGE_HEIGHT - entry_top_rl)
+        fitz_y1 = min(PAGE_HEIGHT, PAGE_HEIGHT - entry_bottom_rl)
+
+        if page_val != 9999:
+            toc_entries_meta.append({
+                'paper_idx': i,
+                'title': paper['title'],
+                'toc_page_idx': entry_toc_page,
+                'body_page_num': page_val,
+                'rect_fitz': (fitz_x0, fitz_y0, fitz_x1, fitz_y1),
+            })
+
         y -= 6  # clean gap before next entry
 
     _draw_toc_footer(c)
     c.save()
+    return toc_entries_meta
 
 
 def _draw_toc_header(canvas):
@@ -1689,25 +1724,55 @@ def _word_wrap(text, font_name, font_size, max_width):
 # PDF MERGE
 # ============================================================
 
-def merge_pdfs(toc_path, body_path, output_path, cover_path=None, invited_talks_path=None):
-    """Merge Cover (optional) + Messages (optional) + Invited Talks (optional) + Table of Contents + Body into a single final PDF."""
+def merge_pdfs(toc_path, body_path, output_path, toc_entries_meta=None):
+    """Merge Table of Contents + Body into a single final PDF with clickable TOC hyperlinks & PDF bookmarks."""
     output_doc = fitz.open()
-
-    if cover_path and os.path.exists(cover_path):
-        cover_doc = fitz.open(cover_path)
-        output_doc.insert_pdf(cover_doc)
-        cover_doc.close()
-
-    if invited_talks_path and os.path.exists(invited_talks_path):
-        talks_doc = fitz.open(invited_talks_path)
-        output_doc.insert_pdf(talks_doc)
-        talks_doc.close()
 
     toc_doc = fitz.open(toc_path)
     body_doc = fitz.open(body_path)
 
+    num_toc_pages = len(toc_doc)
+
     output_doc.insert_pdf(toc_doc)
     output_doc.insert_pdf(body_doc)
+
+    # ── Inject Clickable Hyperlinks in Table of Contents ──
+    if toc_entries_meta:
+        pdf_outline_toc = []
+        for entry in toc_entries_meta:
+            toc_page_idx = entry['toc_page_idx']
+            body_page_num = entry['body_page_num']
+            if body_page_num == 9999 or toc_page_idx >= num_toc_pages:
+                continue
+
+            target_page_0based = num_toc_pages + (body_page_num - 1)
+            target_page_1based = target_page_0based + 1
+
+            # 1. Clickable on-page link annotation (clicking title/page number jumps to abstract)
+            if toc_page_idx < len(output_doc) and target_page_0based < len(output_doc):
+                page = output_doc[toc_page_idx]
+                r = entry['rect_fitz']
+                link_rect = fitz.Rect(r[0], r[1], r[2], r[3])
+                page.insert_link({
+                    'kind': fitz.LINK_GOTO,
+                    'page': target_page_0based,
+                    'from': link_rect,
+                    'to': fitz.Point(0, 0)
+                })
+
+            # 2. PDF Document Outline / Bookmark
+            title_short = entry['title']
+            if len(title_short) > 80:
+                title_short = title_short[:77] + '...'
+            pdf_outline_toc.append([1, title_short, target_page_1based])
+
+        # Set document outline bookmarks
+        if pdf_outline_toc:
+            try:
+                output_doc.set_toc(pdf_outline_toc)
+            except Exception as e:
+                print(f"  [WARN] Could not set PDF outline bookmarks: {e}")
+
     output_doc.save(output_path)
 
     output_doc.close()
@@ -2311,11 +2376,92 @@ def generate_invited_talks_pdf(output_path):
 # PDF TO WORD CONVERSION
 # ============================================================
 
-def convert_pdf_to_word(pdf_path, docx_path):
+def _inject_word_toc_hyperlinks(docx_path, papers):
     """
-    Converts the compiled PDF directly to Word (.docx) format using pdf2docx.
-    This guarantees 1:1 layout fidelity, matching margins, exact headers, footers,
-    dividers, and zero inconsistencies between PDF and Word.
+    Injects Word bookmarks (<w:bookmarkStart>) on body abstract titles and wraps
+    Table of Contents entries inside (<w:hyperlink w:anchor="...">) elements,
+    enabling internal clickable navigation without altering ANY existing styling,
+    fonts, colors, sizes, or dotted leaders.
+    """
+    try:
+        import docx
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        def normalize(text):
+            return re.sub(r'[\.\s\d—\-_,:()\'\"’‘]+', '', text.lower())
+
+        doc = docx.Document(docx_path)
+        first_abs_idx = next(
+            (i for i, p in enumerate(doc.paragraphs) if 'Abstract' in p.text and ('—' in p.text or '-' in p.text)),
+            len(doc.paragraphs)
+        )
+
+        used_body = set()
+        used_toc = set()
+
+        for idx, paper in enumerate(papers):
+            bm_name = f'_Paper_{idx+1}'
+            norm_title = normalize(paper['title'])
+            if not norm_title:
+                continue
+
+            # 1. Add Bookmark to Body Title (at or after first_abs_idx)
+            for i in range(max(0, first_abs_idx - 10), len(doc.paragraphs)):
+                if i in used_body:
+                    continue
+                p = doc.paragraphs[i]
+                txt = p.text.strip()
+                if not txt or 'International Conference' in txt or txt.startswith('Abstract') or txt.startswith('Keywords'):
+                    continue
+                norm_p = normalize(txt)
+                if norm_p[:20] and (norm_p[:20] in norm_title or norm_title[:20] in norm_p):
+                    p_elem = p._p
+                    if not any(bm.get(qn('w:name')) == bm_name for bm in p_elem.findall(qn('w:bookmarkStart'))):
+                        bm_start = OxmlElement('w:bookmarkStart')
+                        bm_start.set(qn('w:id'), str(idx + 1))
+                        bm_start.set(qn('w:name'), bm_name)
+                        bm_end = OxmlElement('w:bookmarkEnd')
+                        bm_end.set(qn('w:id'), str(idx + 1))
+                        p_elem.insert(0, bm_start)
+                        p_elem.append(bm_end)
+                    used_body.add(i)
+                    break
+
+            # 2. Add Hyperlink to TOC Entry (before first_abs_idx)
+            for i in range(first_abs_idx):
+                if i in used_toc:
+                    continue
+                p = doc.paragraphs[i]
+                txt = p.text.strip()
+                if not txt or txt == 'Contents' or 'International Conference' in txt:
+                    continue
+                norm_p = normalize(txt)
+                if norm_p[:20] and (norm_p[:20] in norm_title or norm_title[:20] in norm_p):
+                    p_elem = p._p
+                    if not p_elem.findall(qn('w:hyperlink')):
+                        runs = list(p_elem.findall(qn('w:r')))
+                        if runs:
+                            hyperlink = OxmlElement('w:hyperlink')
+                            hyperlink.set(qn('w:anchor'), bm_name)
+                            hyperlink.set(qn('w:history'), '1')
+                            for r in runs:
+                                p_elem.remove(r)
+                                hyperlink.append(r)
+                            p_elem.append(hyperlink)
+                    used_toc.add(i)
+                    break
+
+        doc.save(docx_path)
+    except Exception as e:
+        print(f"  [WARN] Could not inject Word TOC hyperlinks: {e}")
+
+
+def convert_pdf_to_word(pdf_path, docx_path, papers=None):
+    """
+    Converts the compiled PDF directly to Word (.docx) format using pdf2docx,
+    then adds clickable internal TOC hyperlinks & bookmarks using python-docx
+    while preserving 100% of the visual styling, fonts, and layout.
     """
     try:
         import fitz
@@ -2327,6 +2473,11 @@ def convert_pdf_to_word(pdf_path, docx_path):
         cv = Converter(pdf_path)
         cv.convert(docx_path, start=0, end=None)
         cv.close()
+
+        # ── Inject Clickable TOC Hyperlinks & Bookmarks in Word (.docx) ──
+        if papers:
+            _inject_word_toc_hyperlinks(docx_path, papers)
+
         print(f"  [OK] Successfully converted PDF to Word: {docx_path}")
         return True
     except ImportError:
@@ -2342,8 +2493,8 @@ def convert_pdf_to_word(pdf_path, docx_path):
 # ============================================================
 
 def main():
-    # ── Parse --format=word flag ──
-    output_format = 'pdf'
+    # ── Default format is 'both' (PDF + Word docx conversion) ──
+    output_format = 'both'
     positional_args = []
     for arg in sys.argv[1:]:
         if arg.startswith('--format='):
@@ -2413,44 +2564,24 @@ def main():
         print(f"    Page {page_map.get(i, '?')}: {short_title}")
 
     # ── PDF output ──
-    # Generate cover page if cover_page.json exists
-    cover_temp = os.path.join(output_folder, "_cover_temp.pdf")
-    has_cover = generate_cover_page_pdf(cover_temp)
-    if has_cover:
-        print(f"\n[PROCESS] Generated cover page")
-    else:
-        cover_temp = None
-
-    invited_talks_temp = os.path.join(output_folder, "_invited_talks_temp.pdf")
-    has_invited_talks = generate_invited_talks_pdf(invited_talks_temp)
-    if has_invited_talks:
-        print(f"\n[PROCESS] Generated invited talks")
-    else:
-        invited_talks_temp = None
-
     toc_temp = os.path.join(output_folder, "_toc_temp.pdf")
     print(f"\n[PROCESS] Generating Table of Contents...")
-    generate_toc_pdf(papers, page_map, toc_temp)
+    toc_entries_meta = generate_toc_pdf(papers, page_map, toc_temp)
 
     pdf_output_path = os.path.join(output_folder, "compiled_output.pdf")
-    parts_msg = " Cover +" if has_cover else ""
-    parts_msg += " Invited Talks +" if has_invited_talks else ""
-    merge_pdfs(toc_temp, body_temp, pdf_output_path, cover_path=cover_temp, invited_talks_path=invited_talks_temp)
+    print(f"\n[PROCESS] Merging TOC + Body -> {pdf_output_path}")
+    merge_pdfs(toc_temp, body_temp, pdf_output_path, toc_entries_meta=toc_entries_meta)
 
     # Cleanup temp files
     if os.path.exists(body_temp):
         os.remove(body_temp)
     if os.path.exists(toc_temp):
         os.remove(toc_temp)
-    if cover_temp and os.path.exists(cover_temp):
-        os.remove(cover_temp)
-    if invited_talks_temp and os.path.exists(invited_talks_temp):
-        os.remove(invited_talks_temp)
 
     # ── Convert to Word if requested ──
     docx_output_path = os.path.join(output_folder, "compiled_output.docx")
     if output_format in ('word', 'docx', 'both'):
-        success = convert_pdf_to_word(pdf_output_path, docx_output_path)
+        success = convert_pdf_to_word(pdf_output_path, docx_output_path, papers=papers)
         if not success:
             print("\n[ERROR] Word conversion failed!")
             sys.exit(1)
