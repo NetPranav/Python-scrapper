@@ -1,0 +1,1137 @@
+{
+  "_comment": "Final edited text for the IEEE IGNITE 2.0 abstracts (from \"Final Book of abs.pdf\", plus review fixes). scraper.py uses these fields instead of the extracted ones, matched by source file.",
+  "P104.pdf": {
+    "title": "Design of an AI-Enabled Digital FIR Management System with Real-Time Tracking, Secure Authentication, and Automated Verification",
+    "authors": [
+      {
+        "name": "Tanmay Saha",
+        "affil": 1
+      },
+      {
+        "name": "Vinit Verma",
+        "affil": 1
+      },
+      {
+        "name": "Vedant Vyas",
+        "affil": 1
+      },
+      {
+        "name": "Tanay Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Sushma Khatri",
+        "affil": 1
+      },
+      {
+        "name": "Kamal Kumar Sethi",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "In the era of digital governance, public service systems are undergoing rapid transformation to improve accessibility, efficiency, and transparency. However, essential law enforcement services such as FIR (First Information Report) registration still rely heavily on manual processes, leading to delays, inefficiencies, and lack of accountability. Citizens are often required to physically visit police stations, which can be time-consuming and discouraging, especially in sensitive or urgent situations. This paper presents the design and development of a Virtual Police Station that enables citizens to file FIRs online using OCR-based document processing and Aadhaar-based digital signature authentication. The system integrates a modern full-stack architecture consisting of a React frontend, Spring Boot backend, and MySQL database. It ensures secure identity verification, automated extraction of data from uploaded documents, and real-time complaint tracking. The platform introduces role-based access for citizens and police authorities, improving transparency and operational efficiency. Experimental analysis demonstrates significant reductions in processing time, manual workload, and data errors compared to traditional systems. The proposed solution is scalable, modular, and adaptable for real-world deployment with government integration, making it a promising step toward smart policing and digital governance.",
+    "keywords": "OCR, Aadhaar Authentication, Digital FIR, Spring Boot, React, MySQL, E-Governance"
+  },
+  "P115.pdf": {
+    "title": "A Comparative Study of LLM Prompting Techniques for Root Cause Analysis",
+    "authors": [
+      {
+        "name": "Aayushya Lakkadwala",
+        "affil": 1
+      },
+      {
+        "name": "Akshat Khandelwal",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Root cause analysis (RCA) for cloud-native incidents is hard, and making it harder is the fact that the tooling most teams reach for — threshold alerts and dashboards — stops scaling somewhere around the fifth microservice hop. Large language models offer a different angle: instead of learning a classifier per failure type, you describe the incident in natural language and ask the model to reason about it. The catch is that how you ask matters enormously. This paper runs a controlled head-to-head of four prompting strategies — zero-shot, few-shot, chain-of-thought (CoT), and role-based SRE persona — applied to GPT-4 on a synthetic dataset of 50 cloud incidents drawn from realistic log, metric, and trace patterns. We measure accuracy against ground-truth root cause labels, consistency across repeated trials, reasoning quality (scored by two annotators), and token cost. CoT prompting lands at the top for accuracy (81.3%) and reasoning depth, but its output varies noticeably across trials. Role-based prompting trades a few accuracy points for substantially better consistency and output structure — a worthwhile trade in any automated pipeline. Zero-shot is fast and cheap but misclassifies causal chains in roughly a third of cases. Few-shot turns out to be both the most expensive and the least accurate of the structured approaches, which is not a great position to be in. We also identify four recurring failure modes — symptom anchoring, template mismatch, causal overreach, and hallucinated context — and discuss what each tells us about where the prompting strategy is genuinely breaking down.",
+    "keywords": "AIOps, root cause analysis, prompt engineering, chain-of-thought, few-shot learning, large language models, site reliability engineering, cloud observability, GPT-4, incident management"
+  },
+  "P128.pdf": {
+    "title": "AI-Powered Gaming Assistant Using Artificial Intelligence, Voice Processing, and Real-Time Game Analytics",
+    "authors": [
+      {
+        "name": "Prathmesh Kulkarni",
+        "affil": 1
+      },
+      {
+        "name": "Prajwal Meshram",
+        "affil": 1
+      },
+      {
+        "name": "Pratik Singh",
+        "affil": 1
+      },
+      {
+        "name": "Pranjal Pal",
+        "affil": 1
+      },
+      {
+        "name": "Parichit Ahirwar",
+        "affil": 1
+      },
+      {
+        "name": "Pradeep Bela",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "The gaming industry has evolved significantly with the integration of Artificial Intelligence (AI), machine learning, cloud computing, and real-time analytics. Modern gamers demand intelligent systems capable of improving gameplay, providing strategic guidance, automating repetitive tasks, and enhancing user engagement. This research paper presents the design and development of an AI-Powered Gaming Assistant capable of analyzing gameplay in real time, processing voice commands, predicting strategies, and assisting players during live gaming sessions. The proposed system integrates Natural Language Processing (NLP), machine learning models, computer vision, speech recognition, telemetry analysis, and database-driven personalization to create a comprehensive gaming support platform. The architecture includes modules for voice interaction, game integration, AI strategy prediction, user analytics, and recommendation systems. The assistant is designed to work with multiplayer and single-player games by continuously collecting gameplay data, analyzing player behavior, and generating contextual responses. The research also explores implementation methodologies, system architecture, algorithms, security considerations, performance evaluation, limitations, and future enhancements.",
+    "keywords": "Artificial Intelligence, Gaming Assistant, Machine Learning, Voice Recognition, Real-Time Analytics, NLP, Game Integration, Recommendation System"
+  },
+  "P143.pdf": {
+    "title": "AUTO THINK AI: A Localized Multi-Agent Platform for Privacy-Preserving AI Development",
+    "authors": [
+      {
+        "name": "Amit Patidar",
+        "affil": 1
+      },
+      {
+        "name": "Azhar Mansuri",
+        "affil": 1
+      },
+      {
+        "name": "Devkumar Rajole",
+        "affil": 1
+      },
+      {
+        "name": "Nikhil Singh Rajput",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Cloud-based AI assistants raise concerns about data privacy, recurring cost, and offline accessibility, while most existing tools address only one task (chat, code execution, data analysis, or coding practice) at a time. This paper presents AUTO THINK AI, a locally hosted platform that integrates conversational AI, Python code execution, natural-language CSV analysis, and gamified coding challenges in a single application. The platform builds on widely available open-source components: a five-role agent pipeline (Research, Reasoning, Coding, Critic, Optimizer) orchestrated with LangGraph, locally hosted LLMs (LLaMA 3, Mistral, Qwen2.5-Coder) served through Ollama, a FastAPI backend, and a React.js frontend. We do not claim novelty in the individual components; our contribution is their engineering integration into a single offline workflow and a preliminary evaluation of it. On a CPU-only workstation (no discrete GPU), average latencies were 2.6 s for simple and 4.2 s for complex chat queries (maximum 6.7 s), 1.5 s for code execution (maximum 3.2 s), and 2.1–5.9 s for dataset analysis (maximum 8.3 s). In a small, unblinded, author-rated comparison on 30 composite tasks, the multi-agent pipeline received higher ratings than a single-model baseline; however, this evaluation is limited in scale and should be regarded as preliminary. Code execution uses subprocess-level isolation with time and memory limits, which we explicitly acknowledge is weaker than container- or VM-based sandboxing; we discuss the associated risks and a hardening roadmap.",
+    "keywords": "Multi-agent systems, large language models, local AI, LangGraph, Ollama, code execution, dataset analysis, privacy-preserving AI, FastAPI"
+  },
+  "P147.pdf": {
+    "title": "Insta Calor Box",
+    "authors": [
+      {
+        "name": "G. Keerthana",
+        "affil": 1
+      },
+      {
+        "name": "S. Swetha",
+        "affil": 1
+      },
+      {
+        "name": "M. Thanuja",
+        "affil": 1
+      },
+      {
+        "name": "R. Varshini",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Electronics and Communication Engineering, K. Ramakrishnan College of Technology, Tiruchirappalli, India"
+    ],
+    "abstract": "As more and more people are looking to heat their food on the go, it's necessary to develop an electric-free lunch box that heats up food. This paper is about the innovative and novel ‘Insta Calor Box’ which is a self-heating lunch box that uses the exothermic reaction between calcium oxide (CaO) and water to produce heat. Unlike the traditional electric lunch boxes, the proposed system is reusable, lightweight and can be used for outdoor, travel, emergency, and environments without electrical power. This consists of two low pressure chambers, one for the calcium oxide and another to activate water by triggering the reaction when needed, with a safety design to prevent activation outside the required time. Efficient transfer of the heat from the heat generator to the food is provided by a stainless-steel heat transfer plate without direct contact with the food and the chemicals, thus guaranteeing user safety and food hygiene. The outer body has been insulated to reduce heat loss and to provide a cool touch surface. The Insta Calor Box provides a more convenient and safe method for controlling activation of the thermoforming material as well as improved portability and environmental protection, reduced plastic waste and enhanced safety over competing disposable self-heating meal containers. The proposed design offers a cost-effective and environment-friendly option to instant food heating that is not reliant on electricity which is suitable for students, office workers, travellers, campers, disaster relief workers and military use. Prototype manufacturing, thermal performance analysis and optimization of heating efficiency and insulation materials are to be conducted in the future.",
+    "keywords": "Self-heating lunch box, Calcium oxide, Exothermic reaction, Portable food heating, Thermal insulation, Eco-friendly design, Heat transfer, Food packaging"
+  },
+  "P151.pdf": {
+    "title": "Resource Allocation in Blockchain-Assisted Federated Learning for Mobile Edge Computing: A Comparative Study of Naive, Genetic, and ADMM-Based Allocation Strategies",
+    "authors": [
+      {
+        "name": "Ramesh Kumar",
+        "affil": 1
+      },
+      {
+        "name": "Mohammad Azam",
+        "affil": 1
+      },
+      {
+        "name": "Lakkimsetty Surya Teja",
+        "affil": 1
+      },
+      {
+        "name": "Kavya Sri Birudula",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science and Engineering, SRM University-AP, Amaravati, India"
+    ],
+    "abstract": "Blockchain-assisted federated learning (BCFL) deployed on mobile edge computing (MEC) servers must simultaneously serve two competing tasks under a fixed resource budget: local model training by client devices, and blockchain consensus for tamper-resistant model aggregation. The strategy used to split bandwidth and computation between these tasks directly affects training accuracy, energy expenditure, and client participation, yet the interaction between resource allocation strategy and federated learning algorithm choice has received limited joint study. This paper holds federated averaging (FedAvg) fixed as the baseline aggregation rule and evaluates three resource allocation strategies for a BCFL-MEC edge server: a naive fixed-split allocator, a genetic algorithm (GA) based allocator, and an allocator built on the alternating direction method of multipliers (ADMM). We further evaluate three federated learning aggregation strategies, FedAvg, FedProx, and a fairness-aware variant inspired by q-FFL, under the resource allocation strategy found to be most energy efficient. Using a non-independent and identically distributed (non-IID), size-skewed client population, our experiments show that the ADMM allocator reduces total energy cost by more than 98 percent relative to naive allocation, but consistently fails to meet the completion deadline of the single largest client, causing final model accuracy to fall from 85.8 percent to 39.4 percent. The GA allocator recovers most of this accuracy loss (85.6 percent) while still cutting energy cost by roughly 85 percent relative to the naive baseline, positioning it as a favorable middle ground. We further show that neither FedProx nor the fairness-aware aggregation rule fully compensates for a resource allocator that excludes a client outright, indicating that robustness at the aggregation layer alone cannot substitute for participation-aware resource allocation. These findings motivate a fairness-aware ADMM formulation as a concrete direction for future work.",
+    "keywords": "Blockchain, federated learning, mobile edge computing, resource allocation, alternating direction method of multipliers, genetic algorithm, fairness"
+  },
+  "P162.pdf": {
+    "title": "BoilerTwin: A Physics-Informed Hybrid AI Digital Twin for Real-Time Monitoring and Predictive Control of Industrial Steam Boilers",
+    "authors": [
+      {
+        "name": "Mausam Kumar",
+        "affil": 1
+      },
+      {
+        "name": "Manni Kumar",
+        "affil": 1
+      },
+      {
+        "name": "Keerti Vardhan Singh",
+        "affil": 1
+      },
+      {
+        "name": "Sidharth Kumar",
+        "affil": 1
+      },
+      {
+        "name": "Parimeeta Magroliya",
+        "affil": 1
+      },
+      {
+        "name": "Gaurav",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science and Engineering, Chandigarh University, Gharuan, India"
+    ],
+    "abstract": "Industrial steam boilers are typically monitored by reactive SCADA systems that log threshold alarms but cannot anticipate future states, leaving operators unable to predict pressure excursions or efficiency loss before they occur. This paper presents BoilerTwin, a physics-informed hybrid artificial intelligence digital twin for a 6.1-litre industrial-representative steam boiler. The twin solves a rigorous first-principles four-equation Index-1 Differential-Algebraic Equation (DAE) system, derived from mass, energy, and momentum conservation over a two-region (water and steam-dome) lumped-parameter model, using IAPWS-97 thermodynamic property tables. An Extended Kalman Filter (EKF) fuses noisy ESP32-acquired sensor telemetry with the physics model to produce stable, jump-free state estimates, while a lightweight scikit-learn residual regressor corrects small unmodelled non-linearities on top of the physics forecast. The system was validated through 1,000 automated consistency tests (100% pass rate, including exact mass conservation and second-law compliance at every timestep), a simulated 45-minute field-validation cycle against IAPWS-97 ground truth (temperature RMSE 2.01 °C, MAPE 0.46%; pressure MAPE 1.16%), and a live hardware session with 21,364 EKF fusion cycles and zero filter resets. The resulting 10-minute physics-based forecast achieved 97.2% verified accuracy against live sensor readings. Results indicate that a physics-first hybrid architecture can deliver commercial-twin-grade predictive accuracy on open, low-cost hardware, opening a practical path to predictive maintenance and virtual commissioning for mid-tier industrial boiler operators.",
+    "keywords": "Digital twin, industrial boiler, differential-algebraic equations, Extended Kalman Filter, physics-informed machine learning, IAPWS-97, predictive maintenance, sensor fusion"
+  },
+  "P168.pdf": {
+    "title": "IoT-Based Smart Oxygen Assistance Mask",
+    "authors": [
+      {
+        "name": "Siya Verma",
+        "affil": 1
+      },
+      {
+        "name": "Suhani Dutta",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Electronics Engineering, Medi-Caps University, Indore, India"
+    ],
+    "abstract": "The increasing need for portable and real-time healthcare monitoring systems has led to the development of smart wearable devices. This project presents an IoT-based oxygen assistance mask designed to monitor oxygen levels in real time. The system uses sensors to detect environmental conditions and a microcontroller to process the data. The collected data is transmitted to a mobile application through IoT platforms for remote monitoring. In case of abnormal oxygen levels or poor air quality, the system provides alerts to the user through a buzzer and notifications. The proposed system is cost-effective, portable, and user-friendly, making it suitable for personal healthcare and emergency monitoring applications. Physical activities and intensive exercise can cause variations in oxygen saturation, heart rate, and body temperature. Continuous monitoring of these physiological parameters is essential to prevent health complications and ensure user safety. This paper presents a Smart Oxygen Assistance Mask for Physical Activity Monitoring based on ESP32 and physiological sensors. This paper presents the design and development of an IoT-based oxygen assistance mask for real-time monitoring of oxygen levels.",
+    "keywords": "IoT, Oxygen Monitoring, Smart Mask, ESP32, Wearable Device, Healthcare System, Portability"
+  },
+  "P169.pdf": {
+    "title": "A Blockchain-Based Decentralized Digital Credential Management System for Students",
+    "authors": [
+      {
+        "name": "Anita Dombale",
+        "affil": 1
+      },
+      {
+        "name": "Nitish Sahu",
+        "affil": 1
+      },
+      {
+        "name": "Palash Sahuji",
+        "affil": 1
+      },
+      {
+        "name": "Aditya Rana",
+        "affil": 1
+      },
+      {
+        "name": "Manthan Sali",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science (Artificial Intelligence), Vishwakarma Institute of Technology, Pune, India"
+    ],
+    "abstract": "An increase in the use of digital certificates in education requires more reliable, secure and efficient means of credential management. Limitations of the traditional centralized approach include possible problems related to the manipulation of the data stored. Poor transparency and long times required for the process of verification are included among other disadvantages. This paper proposes a novel approach to digital credential management that utilizes both the blockchain and IPFS technologies. It is designed to issue, store, search, verify and revoke academic credentials. The system saves the credentials in IPFS and stores their SHA-256 hashes, addresses of issuers and students, time stamps and status information through Solidity smart contracts. Role-based access control is used to manage interaction between issuers, students and verifiers. In order to enhance the proposed approach, decentralized identifiers (DIDs) and verifiable credentials (VCs) may be utilized to identify the issuer of credentials, perform digital signature verification and secure the process of credential sharing. Status management via the method of smart contracts makes it possible to recognize credentials which have been revoked. The prototype of the proposed approach was developed using the following technologies: React, Node.js, Express, MongoDB, Solidity, Hardhat, and MetaMask for connecting to the blockchain.",
+    "keywords": "Blockchain, Tamper-proof Certification, IPFS, Credential Authentication, Cryptographic Hashing, Decentralization Verification and Storage"
+  },
+  "P174.pdf": {
+    "title": "Sports Performance Analyzer: A Data-Driven Framework for Multi-Sport Player Performance Evaluation",
+    "authors": [
+      {
+        "name": "Gajjela Prakash",
+        "affil": 1
+      },
+      {
+        "name": "Lakavath Saicharan",
+        "affil": 1
+      },
+      {
+        "name": "Veggilapu Sairam",
+        "affil": 1
+      },
+      {
+        "name": "Banadari P Soundarya",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Computer Science and Engineering (Data Science), Vardhaman College of Engineering, Hyderabad, India"
+    ],
+    "abstract": "Many analytical tools for sports performance are built around a single sport, specialized tracking equipment, or expert analysts, which places them out of reach for developing players, school teams, and small clubs. This paper presents a Sports Performance Analyzer for cricket, football, and basketball that converts sport-specific player statistics into three interpretable indicators: Relevance, Contribution, and Consistency. Relevance is obtained from standardized features and a one-component Principal Component Analysis (PCA) model; Contribution is calculated from sport-specific weighted statistics and normalized to a 0–100 scale; and the final Combined Score uses weights of 0.50, 0.35, and 0.15 for Relevance, Contribution, and Consistency, respectively. The evaluation uses the datasets and trained models bundled with the project implementation: 50 player records for each sport, 150 in total. The first PCA component explains 61.35% of the variance for cricket, 57.76% for football, and 39.72% for basketball, and the mean Combined Scores are 56.17, 44.73, and 56.17, respectively. The results show that the implementation produces reproducible, sport-specific scores and category distributions. The current implementation assigns a default Consistency value of 50 to single-record analysis; longitudinal consistency is therefore reported as a limitation and a future extension rather than a validated temporal metric.",
+    "keywords": "Sports analytics, performance analysis, principal component analysis, data analysis, visualization, multi-sport evaluation"
+  },
+  "P177.pdf": {
+    "title": "Predicting Female Educational Vulnerability Across Rural Indian Districts: A Spatial Leakage-Controlled Interpretable Machine Learning Framework",
+    "authors": [
+      {
+        "name": "Rachana Kotiyan",
+        "affil": 1
+      },
+      {
+        "name": "Sahar Mariam Baig",
+        "affil": 2
+      },
+      {
+        "name": "Kiran K",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science and Engineering, University Visvesvaraya College of Engineering, Bengaluru, India",
+      "DC Testing FT, Hewlett Packard Enterprise, Bengaluru, India"
+    ],
+    "abstract": "Educational vulnerability among females across rural India remains highly non-uniform, where the differences amongst the regions regarding women’s schooling are often tied to health, economic status, social conditions and household infrastructure. This study develops an interpretable machine learning framework based on district-level indicators using data from 704 rural districts in the National Family Health Survey (NFHS-5). This framework is used to predict educational vulnerability, defined by a threshold below which districts are classified as vulnerable, where fewer than 35% of women have completed at least ten years of schooling. Twenty-five predictors, selected manually from 103 candidate indicators cover women’s social status, maternal and child health, nutrition, literacy, early marriage, menstrual hygiene, clean cooking fuel and household conditions. Using random cross-validation and state-wise grouped cross-validation, three machine learning models – Logistic Regression, Random Forest and LightGBM are tested. To check whether the results remain stable, different vulnerability thresholds are also tested. As per the results, when entire states are kept out for testing, model performance decreases. This indicates that when nearby districts with similar conditions are present in both the training and test data, random cross-validation can give overly high results. In stricter validation, LightGBM and Random Forest performed below expectations, while Logistic Regression gives consistent results and remains easier to interpret. The low female education is related to other forms of disadvantage, including low literacy, early marriage, limited access to clean cooking fuel, and poor menstrual hygiene. These findings show that we can identify vulnerable districts more reliably and support targeted policies that address multiple causes of female educational disadvantage with the help of geographically aware and interpretable machine learning.",
+    "keywords": "District-Level Female Educational Vulnerability Prediction, Educational Deprivation, GroupKFold Cross-Validation, Interpretable Machine Learning, NFHS-5 Dataset, Spatial Data Leakage"
+  },
+  "P178.pdf": {
+    "title": "Next-Generation Smart Building Energy System Using AI-Driven Prediction",
+    "authors": [
+      {
+        "name": "Tanya Sinha",
+        "affil": 1
+      },
+      {
+        "name": "Sahil Chauhan",
+        "affil": 1
+      },
+      {
+        "name": "Himank Jadhav",
+        "affil": 1
+      },
+      {
+        "name": "Aparna Keshari",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "We propose an AI-driven predictive analytics framework for smart building energy management designed to address increasing energy demand and dynamic building operating conditions. The proposed framework integrates IoT-based sensing, lightweight machine learning models, edge computing, and adaptive rule-based control for intelligent energy management. Sensor-derived parameters such as energy consumption, indoor temperature, humidity, CO₂ concentration, occupancy, and equipment usage are considered for short-term prediction and control. Classical machine learning models, including Random Forest, Gradient Boosting, and Support Vector Regression, are employed for predicting energy demand and occupancy patterns. The predicted information is subsequently used by an adaptive decision layer to optimize HVAC, lighting, and ventilation operations. The framework is evaluated through analytical and simulation-oriented performance assessment rather than full-scale physical deployment. The evaluation indicates potential improvements in prediction accuracy, energy efficiency, and system responsiveness, with the analyzed results indicating 17–23% potential energy savings and improved occupancy-aware control. The study demonstrates the feasibility of combining lightweight machine learning with edge-based decision-making for scalable smart building energy management and provides a foundation for future real-building validation.",
+    "keywords": "Smart Building, Energy Management, Machine Learning, IoT, Energy Optimization, Edge Computing"
+  },
+  "P179.pdf": {
+    "title": "Intelligent Systems, Data Science & Computational Intelligence",
+    "authors": [
+      {
+        "name": "Aashutosh Rajput",
+        "affil": 1
+      },
+      {
+        "name": "Aditi Gupta",
+        "affil": 1
+      },
+      {
+        "name": "Arunav Paliwal",
+        "affil": 1
+      },
+      {
+        "name": "Aastha Dwivedi",
+        "affil": 1
+      },
+      {
+        "name": "Aayush Batole",
+        "affil": 1
+      },
+      {
+        "name": "Divy Pratap Singh Gaharawar",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of CSE (AI&ML), Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Intelligent systems, modern data science, and computational intelligence constitute the multi-layered computational stack that transforms high-entropy, distributed raw data into structured perception, multi-step analytical reasoning, and autonomous decision-making. Conventional surveys evaluate individual artificial intelligence disciplines in isolation and benchmark candidate algorithms almost exclusively on empirical accuracy under closed-world assumptions. This comprehensive survey investigates the operational dynamics of contemporary intelligent architectures across foundational language modeling, multimodal visual perception, parameter-efficient edge execution (TinyML), post-hoc and intrinsic explainability, instruction alignment, and legal-ethical compliance pipelines. Through an explicit review of 14 landmark contributions spanning compute-optimal frontier architectures, foundation perception, embedded edge frameworks, trustworthy methodologies, and statutory frameworks, this paper evaluates trade-offs across computational complexity, memory bandwidth, latency, explanation fidelity, and systemic alignment. We identify five persistent research gaps: compute-optimal training versus edge deployment asymmetries, spatial-relational grounding deficiencies in multimodal models, post-hoc explanation infidelity, optimization gaming during human-preference alignment, and the translation of statutory governance mandates into concrete loss objectives. To reconcile these tensions, we propose the Unified Responsible Intelligent Data System (URIDS)—a six-layer conceptual architecture spanning governance, engineering, learning, reasoning, human interaction, and continuous monitoring to embed accountability, resource constraints, and verifiable oversight directly into the model lifecycle.",
+    "keywords": "Foundation Models, Multimodal Systems, TinyML, Explainable AI, Alignment, EU AI Act, URIDS, Trustworthy AI"
+  },
+  "P187.pdf": {
+    "title": "Single-Cell Sequencing and AI Integration for Early Cancer Detection: A Computational",
+    "authors": [
+      {
+        "name": "Sanskriti Mandloi",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Cancer is easiest to treat when it’s caught early, but traditional scans or bulk molecular tests usually only pick up the disease once a tumor gets big enough to make itself known. That’s just too late for many people. Single-cell sequencing changes the game by profiling each cell individually, rather than lumping everything together. This means scientists can spot those rare, sneaky malignant or pre-malignant cells before anyone would notice abnormal symptoms. But that’s the problem: single-cell datasets are huge and complicated. It’s like finding a needle in a haystack — you need AI and machine learning to separate the important signals from all the noise. This paper dives into how single-cell RNA and DNA sequencing work, why they leave bulk methods in the dust for early detection, the machine learning tools being used to crack open single-cell data, and where these techniques are entering real-world clinical practice. It looks at liquid biopsy, ways to spot pre-malignant lesions, monitoring minimal residual disease, plus it doesn’t shy away from the challenges like messy data, the heavy computational demand, lack of standard protocols, and scarce labeled datasets. Finally, the paper talks about where the field is heading — multi-omics (where lots of different data streams are integrated) and federated learning (training AI collaboratively without sharing sensitive patient data). Examples like pan-cancer classification, finding early-stage lung cancer markers in blood, and machine learning methods for circulating tumor cells show how everything comes together.",
+    "keywords": "Single-Cell Sequencing, AI Integration, Early Cancer Detection"
+  },
+  "P188.pdf": {
+    "title": "Agentic AI and Autonomous AI Systems: A Survey of Architectures, Evaluation Benchmarks, and Safety Challenges",
+    "authors": [
+      {
+        "name": "Ragini Shukla",
+        "affil": 1
+      },
+      {
+        "name": "Shashank Srivastava",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science and Engineering, Buddha Institute of Technology, GIDA, Gorakhpur, India"
+    ],
+    "abstract": "The fast evolution of large language models (LLMs) has resulted in emergence of a certain class of systems, often referred to as agentic artificial intelligence (agentic AI), which plans, utilizes external services, remembers its actions across multiple steps and acts on multi-step goals with minimal human intervention. The development of agentic AI has led to a wide body of research in multiple areas such as architecture of agents, multi-agent coordination architectures, capability benchmarks, and the emerging literature on safety and security of agents. This paper provides a comprehensive survey of the field of agentic AI and autonomous AI, starting with clarifying definitions that differentiate agentic AI from other concepts, such as autonomous AI systems, generative AI, and multi-agent systems. Architectural solutions for agentic AI are considered according to their fit to generic sense-plan-act loop framework; examples of agents' reasoning, tool utilization, and memory strategies are discussed; and major benchmarks for evaluating capability of agents are reviewed. Then documented failure modes of agents, such as hallucination propagation, planning problems, and prompt injection-based agent hijacking are analyzed, and current state of research on safety and reliability of agents is reviewed. In this way, a list of research gaps based on the literature review is proposed, including lack of benchmarking tools measuring both capabilities.",
+    "keywords": "Agent-based AI, autonomous AI systems, large language models, AI agents, multi-agent systems, tool-enhanced LLMs, agent assessment, AI safety, prompt injection"
+  },
+  "P189.pdf": {
+    "title": "Biochar-Assisted Bioremediation for Sustainable Soil and Water Restoration: A Systematic Comparative Evidence Synthesis",
+    "authors": [
+      {
+        "name": "Aastha Agrawal",
+        "affil": 1
+      },
+      {
+        "name": "Aditya Sharma",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Biochar-assisted bioremediation integrates the physicochemical properties of biochar with biological remediation processes to manage contaminated soil and water. This study presents a structured secondary-data evidence synthesis that organizes published findings around a defined research question, a 24-stage research workflow, contaminant-specific removal mechanisms, biological synergies, environmental risks, and implementation criteria. The evidence was compared using predefined criteria, including feedstock type, pyrolysis temperature, physicochemical properties, contaminant class, treatment conditions, reported remediation mechanisms, and environmental safety considerations. The synthesis indicates that biochar performance depends on feedstock composition, thermochemical processing, surface chemistry, pore structure, mineral phases, solution pH, and contaminant characteristics. Heavy metals may be immobilized through cation exchange, surface complexation, electrostatic interactions, and precipitation, whereas organic contaminants can be retained through pore filling, hydrophobic interactions, hydrogen bonding, and π–π interactions. Biochar can also support phytoremediation and microbial remediation by modifying contaminant bioavailability and providing a porous microbial habitat. However, remediation performance is contaminant-specific. Unmodified biochar may exhibit limited affinity for anionic nutrients such as nitrate and phosphate, particularly when suitable binding sites are absent or surface charge is unfavorable. Modified biochars and coupled biological treatment systems may improve removal under these conditions, although their effectiveness depends on water chemistry, treatment configuration, and material stability. Potential environmental risks include polycyclic aromatic hydrocarbons, concentrated metals, contaminant remobilization, and secondary contamination. The study proposes a transparent evidence-selection framework and a four-treatment validation model comprising an untreated contaminated-water control, biochar treatment, phytoremediation, and combined biochar–phytoremediation. Independent replication, appropriate statistical analysis, material characterization, and long-term monitoring are identified as essential requirements for future validation. The framework supports contaminant-specific biochar selection and provides a practical foundation for subsequent laboratory, mesocosm, and field-scale investigations.",
+    "keywords": "Biochar, bioremediation, phytoremediation, microbial remediation, soil restoration, water remediation, heavy metals, nitrate, phosphate, PFAS, micro plastics"
+  },
+  "P190.pdf": {
+    "title": "Improving Drought Stress Resistance in Crops Using CRISPR/Cas9 Genome Editing",
+    "authors": [
+      {
+        "name": "Anushka Varma",
+        "affil": 1
+      },
+      {
+        "name": "Khushi Khanduja",
+        "affil": 1
+      },
+      {
+        "name": "Pragya Goyal",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Drought is one of the main abiotic factors that impacts crop productivity and plant growth. It restricts the availability of water and nutrients, which are essential for plant growth and survival. As a result, it reduces agricultural yield, slows plant growth, and causes plant death. The severity and duration of the drought affect the growth of the plants. CRISPR technology has opened a new era in crop modification by providing a precise method for changing genes that are involved in plant responses. This review covers the effects and processes of abiotic and drought stress, regulation of gene expression, stress-responsive genes and the role of CRISPR/Cas9 in improving drought tolerance.",
+    "keywords": "Drought stress, CRISPR/Cas9, Genome editing, Plant tolerance, Stress-responsive genes"
+  },
+  "P191.pdf": {
+    "title": "LegalSaathi: An AI-Powered Multilingual Platform for Legal Guidance, Case Management, and Affordable Lawyer Consultation in India",
+    "authors": [
+      {
+        "name": "Arpit Garg",
+        "affil": 1
+      },
+      {
+        "name": "Bhavna Mishra",
+        "affil": 1
+      },
+      {
+        "name": "Arpita S. Hirani",
+        "affil": 1
+      },
+      {
+        "name": "Bhawan Rathore",
+        "affil": 1
+      },
+      {
+        "name": "Ankit Mourya",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "India continues to face a significant gap in access to legal services, where a large number of citizens are unable to afford legal consultation or understand complex judicial procedures. Legal information and case updates are often presented in technical legal language, limiting accessibility for non-expert users. This paper presents LegalSaathi, a multilingual AI-assisted platform designed to improve access to affordable legal guidance. The system enables real-time case tracking from eCourts with simplified explanations in Hindi and English, along with an AI-based legal assistant that responds to user queries in clear and concise language with appropriate legal disclaimers. A key feature of the proposed system is a request-based lawyer consultation module, where users submit legal queries and verified advocates can accept requests based on availability and expertise. Upon acceptance, direct consultations are conducted at a fixed and standardized fee of ₹500 per session, ensuring transparency and affordability. The platform also provides multilingual support across major Indian languages to improve accessibility for users with limited literacy. LegalSaathi integrates AI-driven assistance with human legal expertise to reduce barriers in legal access and improve the overall efficiency of legal support services.",
+    "keywords": "AI-Powered Multilingual Platform, Legal Guidance, Case Management, Affordable Lawyer Consultation, LegalSaathi"
+  },
+  "P193.pdf": {
+    "title": "NextDegree AI: A Profile-Driven Study-Abroad Planning Platform",
+    "authors": [
+      {
+        "name": "Harshwardhan Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Dhanraj Singh",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science and Engineering, Acropolis Institute of Technology & Research, Indore, India"
+    ],
+    "abstract": "Students in India who plan to pursue higher education abroad often need to evaluate university suitability, admission requirements, and financial feasibility using multiple independent sources. These fragmented workflows increase the effort required to make informed decisions. This paper presents NextDegree AI, a web-based platform that integrates profile-driven university recommendations, education loan and Equated Monthly Installment (EMI) estimation, return-on-investment (ROI) analysis, and an AI mentor chatbot powered by a large language model (LLM). The platform uses a React.js frontend and a FastAPI backend, supported by a structured dataset containing 60 university-program entries from 41 universities across five countries. The recommendation engine applies a weighted multi-criteria scoring approach based on CGPA, GRE score, budget, and country preference, while course interest is used to filter relevant programs before ranking. Across five representative student profiles, the reported recommendation response times had a mean of approximately 12.28 ms, including one initial cold-start measurement. A 15-case functional test suite was conducted to evaluate the implemented modules. In addition, 15 chatbot questions were evaluated for factual correctness, relevance, and safety compliance, resulting in scores of 80%, 93%, and 100%, respectively. The results demonstrate the feasibility of integrating academic recommendation, financial planning, and LLM-based mentorship within a unified student profile. The current system uses a heuristic recommendation method and a static dataset, while retrieval-augmented generation (RAG) and real-time data integration remain future work.",
+    "keywords": "Study-abroad planning, University recommendation system, multi-criteria decision making, education loan EMI, ROI Analysis, LLM chatbot, FastAPI, React.js"
+  },
+  "P198.pdf": {
+    "title": "Effect of Nozzle Outlet Diameter and Inlet Pressure on Hydraulic Characteristics and Experimental Spray Range of a Single-Nozzle Water Dust Suppression System",
+    "authors": [
+      {
+        "name": "Tanishq Shah",
+        "affil": 1
+      },
+      {
+        "name": "Dev Makati",
+        "affil": 1
+      },
+      {
+        "name": "Ayaan Sayyed",
+        "affil": 1
+      },
+      {
+        "name": "Ravi Terkar",
+        "affil": 1
+      },
+      {
+        "name": "Rajesh Patil",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Mechanical Engineering, MPSTME, NMIMS, Mumbai, India"
+    ],
+    "abstract": "Water mist dust suppression systems are widely used on construction and other industrial sites to control the airborne particulate matter and reduce airborne particulate concentrations and associated air quality impacts. Yet the hydraulic design basis, which connects the nozzle outlet diameters, the inlet pressures, and the other parameters, is rarely reported in the open literature for compact single-nozzle configurations. This work presents a CFD parametric study of a single circular nozzle over the outlet diameters of 1 to 2.5 mm and inlet pressure is 60 to 140 bar, from which the exit velocity, volumetric and mass flow rate, Reynolds number are calculated. These outputs are then used to derive the discharge coefficient, Weber number, Ohnesorge number, and a first-order theoretical estimate of the characteristic breakup scale. The principal engineering implication is that, within the tested range, nozzle diameter and pressure trade off water consumption against exit velocity and the estimated characteristic breakup scale in a quantifiable way.",
+    "keywords": "Water dust suppression, CFD, nozzle diameter, inlet pressure, spray characteristics, Weber number, Ohnesorge number"
+  },
+  "P200.pdf": {
+    "title": "Automated Brain Tumor Detection System Using Image Processing",
+    "authors": [
+      {
+        "name": "Nadiminti Rajesh",
+        "affil": 1
+      },
+      {
+        "name": "G. Kiran Kumar",
+        "affil": 1
+      },
+      {
+        "name": "K. Shailaja",
+        "affil": 1
+      },
+      {
+        "name": "G. Vishnu Murthy",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "School of Engineering, Anurag University, Hyderabad, India"
+    ],
+    "abstract": "Brain tumor identification from MRI scans is a complex medical imaging task that requires reliable and accurate analysis. The proposed Brain Tumor Detection System integrates traditional image processing techniques with machine learning and deep learning methods to detect, segment, and classify tumors effectively. The system follows a structured workflow involving MRI acquisition, image enhancement, tumor segmentation, feature extraction, and classification. Preprocessing techniques such as grayscale conversion, CLAHE, median filtering, image normalization, and edge detection are applied to improve image quality and minimize noise. Tumor regions are identified using Otsu thresholding, watershed segmentation, morphological operations, and U-Net-based segmentation. For tumor classification, a transfer-learning-based ResNet-50 model is employed. Data augmentation, batch normalization, and dropout are incorporated to improve model robustness and minimize overfitting. Grad-CAM is used to interpret the classification results. The system is implemented using Python, TensorFlow, and OpenCV and evaluated using Accuracy, Precision, Recall, and F1-score.",
+    "keywords": "Brain Tumor Detection, MRI, Medical Image Processing, Image Segmentation, U-Net, ResNet-50, Transfer Learning, CLAHE, Otsu Thresholding, Watershed Segmentation, Morphological Operations, Data Augmentation, Batch Normalization, Dropout, Grad-CAM, Image Classification, TensorFlow, OpenCV, Accuracy, Precision, Recall, F1-Score"
+  },
+  "P201.pdf": {
+    "title": "Multi-Objective Optimization of a Solar-Wind-Battery Hybrid Microgrid for Sustainable Rural Electrification in India",
+    "authors": [
+      {
+        "name": "Jeet Pradhan",
+        "affil": 1
+      },
+      {
+        "name": "Ayaan Sayyed",
+        "affil": 1
+      },
+      {
+        "name": "Megh Chalke",
+        "affil": 1
+      },
+      {
+        "name": "Ravi Terkar",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Mechanical Engineering, MPSTME, NMIMS, Mumbai, India"
+    ],
+    "abstract": "Reliable electricity access remains a significant challenge in many rural regions of India, motivating the development of sustainable standalone renewable energy systems. This paper presents a multi-objective optimization framework for a standalone solar photovoltaic (PV), wind turbine and battery energy storage system for rural electrification in Bhuj, Gujarat. Hourly meteorological data are used to model renewable energy generation, while an hourly simulation framework evaluates the interaction between renewable generation, load demand and battery storage. The Non-dominated Sorting Genetic Algorithm II (NSGA-II) is employed to identify Pareto-optimal system configurations by simultaneously minimizing installed capital cost and annual unmet load. A minimum-distance decision criterion is used to select a balanced compromise solution from the Pareto-optimal set. The proposed framework further evaluates the selected configuration through load sensitivity analysis and repeated optimization runs to assess its robustness. The study provides a systematic approach for evaluating cost-reliability trade-offs in standalone solar-wind-battery microgrids and supports informed capacity planning for rural renewable energy applications.",
+    "keywords": "Battery energy storage, hybrid microgrid, NSGA-II, rural electrification, solar photovoltaic, wind energy"
+  },
+  "P202.pdf": {
+    "title": "Disrupting the Digital Drug Supply Chain through Community-Led Reporting and Automated Jargon Detection",
+    "authors": [
+      {
+        "name": "Aditya Jain",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of CSE-Cyber Security, AITR, Indore, India"
+    ],
+    "abstract": "This digital forensics research study and detection strategy is created with the intention of detecting and reporting the activities of drug trafficking via the usage of encrypted communication apps such as Telegram, the Dark Web, and others. The proposed study takes into account the phenomenon which sees the rise of the use of automated linguistic camouflage, otherwise known as bot shops, to escape any form of platform regulation through the employment of Linguistic Camouflage and evolving slang terms and emoji metadata. By bridging the gap between automated linguistic pattern recognition and actionable reporting, our research offers a proactive solution to secure digital ecosystems and reduce the societal harm of the modern digital drug trade prior to marketplace expansion.",
+    "keywords": "Digital forensics, Dark web, Telegram narcotics, Linguistic camouflage, Automated jargon detection, Bot shops, Emoji metadata, Automation, Community-led reporting, Supply chain disruption"
+  },
+  "P205.pdf": {
+    "title": "DFT Analysis of Carbon Nanotubes for Biomedical Applications: A Review",
+    "authors": [
+      {
+        "name": "Arzoo Mehta",
+        "affil": 1
+      },
+      {
+        "name": "Shubhi Tiwari",
+        "affil": 1
+      },
+      {
+        "name": "Vicky Patel",
+        "affil": 1
+      },
+      {
+        "name": "Kirtesh Pratap Khare",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Density Functional Theory (DFT) is a useful computational method for studying the properties of materials and molecules at the atomic level. It helps researchers understand their structure, electronic behavior, energy, and chemical interactions. Carbon nanotubes (CNTs), especially single-walled carbon nanotubes (SWCNTs), have received considerable attention in biomedical research because of their high surface area, mechanical strength, and unique electrical and chemical properties. DFT helps study how drugs interact with nanotube surfaces, how stable these interactions are, and how CNTs can be modified for drug delivery. Several studies have explored CNTs for carrying therapeutic compounds, including anticancer drugs such as 6-thioguanine, azacitidine, temozolomide, thalidomide, doxorubicin, and 5-fluorouracil. CNT-based systems have also been studied for delivering bisphosphonate drugs used in bone-related treatments. In the present review paper, we discuss the importance of CNTs in biomedical applications by using the DFT method because the DFT method is less time-consuming, eco-friendly, and cheaper in comparison to experimental methods. This paper provides a platform for new researcher for knowing the importance of CNTs in biomedical applications by using the DFT method.",
+    "keywords": "DFT, CNT, Biomedical, Sensors"
+  },
+  "P210.pdf": {
+    "title": "ARTORY: An AI-Powered Artist Community Platform for Art History Learning, Skill Development, and Creative Networking",
+    "authors": [
+      {
+        "name": "Pranjal Pal",
+        "affil": 1
+      },
+      {
+        "name": "Prajwal Meshram",
+        "affil": 1
+      },
+      {
+        "name": "Prathmesh Kulkarni",
+        "affil": 1
+      },
+      {
+        "name": "Pratik Singh",
+        "affil": 1
+      },
+      {
+        "name": "Priyansh Shukla",
+        "affil": 1
+      },
+      {
+        "name": "Parichit Ahirwar",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Digital artists today are dealing with a massively scattered online environment. If you want to host your portfolio, talk to other artists, learn new skills, or actually find paying clients, you have to juggle four or five different websites. In this paper, we introduce ARTORY. It is a unified digital ecosystem built specifically for artists. Unlike most platforms today, we completely removed algorithmic curation. Every artist gets open access to their audience regardless of their perceived skill level. Our system pulls together social networking, direct mentorship, and interactive e-learning. We also tackled the generative AI problem by creating a hard architectural split between human-made art and AI outputs, which protects community trust. To help artists actually make a living, we propose a client-led reverse-bidding model for freelance work, backed by escrow protections. We handle intellectual property theft using a community-driven plagiarism control system based on cryptographic timestamps. Finally, we put our MERN-based architecture through heavy stress testing. The results show it easily supports 12,500 simultaneous users while keeping WebSocket latency under 45 milliseconds. This proves the system is entirely viable for a large-scale, real-world launch.",
+    "keywords": "Digital Art, E-learning, AI Integration, Social Computing, Freelance Marketplace, Art Therapy, Plagiarism Detection"
+  },
+  "P211.pdf": {
+    "title": "Role of Molecular Docking in Identifying Phytochemical Inhibitors of Pancreatic Cancer",
+    "authors": [
+      {
+        "name": "Ishika Bundela",
+        "affil": 1
+      },
+      {
+        "name": "Vinayak Yadav",
+        "affil": 1
+      },
+      {
+        "name": "Seema Kelotra",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Pancreatic cancer is one of the most aggressive malignancies and remains a major challenge because of its rapid progression, late diagnosis, metastatic potential, and limited therapeutic options. The identification of novel therapeutic agents is therefore important in the control of cancer. Natural products and plant-derived phytochemicals are an important source of structurally diverse molecules with potential anticancer activity. However, the experimental screening of this large number of phytochemicals for investigation is very laborious and expensive. Computational approach such as Molecular docking has emerged as an important method for predicting interactions between phytochemicals and cancer-associated protein targets and narrowing compounds for further investigation. Several pancreatic cancer-associated targets, including JAK1, FAK1, KRAS, AKT2, Src, Aurora 2 kinase, and proteins involved in RAS-related signaling pathways have employed molecular docking to investigate potential phytochemicals. In addition, other computational approach such as pharmacophore modelling, virtual screening, network pharmacology, pharmacokinetic and ADMET prediction strengthen the molecular docking-based analysis. This review presents the major molecular targets and role of molecular docking in identifying potential phytochemical inhibitors of pancreatic cancer",
+    "keywords": "Pancreatic cancer, phytochemicals, molecular docking, natural products, inhibitors"
+  },
+  "P212.pdf": {
+    "title": "A Compute-Aware Hybrid Taxonomy of Hallucination Detection in Large",
+    "authors": [
+      {
+        "name": "Khush Shah",
+        "affil": 1
+      },
+      {
+        "name": "Sayyad Malik Agha",
+        "affil": 1
+      },
+      {
+        "name": "Vijay Gupta",
+        "affil": 1
+      },
+      {
+        "name": "Monica Parashar",
+        "affil": 1
+      },
+      {
+        "name": "Smriti Jain",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Hallucination detection is a central reliability problem for large language models (LLMs), but detection methods are rarely compared under the hardware constraints faced by students, independent developers, and small research labs. This paper presents a structured survey of hallucination detection methods organized into four primary methodological paradigms: predictive and semantic uncertainty, internal representation and activation probing, deductive consistency and belief propagation, and retrieval/black-box consistency with lightweight system judges. The survey adds a compute-aware perspective by comparing model-access requirements, sampling multiplicity, latency, and VRAM pressure, and by distinguishing factuality detection from source-grounded faithfulness checking. Based on this synthesis, we propose a hierarchical lazy-routing architecture that escalates from inexpensive internal signals to retrieval-based verification and finally to expensive judge or deductive checks only for ambiguous cases. We also specify a reproducible resource-constrained evaluation protocol, including an explicit LLM-as-a-Judge baseline, routing ablations, threshold analysis, and hardware measurements. The paper does not claim empirical validation of the proposed frontier or routing policy; rather, it defines a testable framework for future evaluation on a single consumer GPU. The resulting roadmap connects the hallucination-detection literature to a practical deployment strategy for resource-constrained labs.",
+    "keywords": "Hallucination Detection, Semantic Entropy, Activation Probing, Deductive Consistency, Belief Propagation, Retrieval-Augmented Verification, LLM-as-a-judge, Consumer GPU, Quantization"
+  },
+  "P220.pdf": {
+    "title": "AI- and IoT-Based Early Warning and Protective System for Glacial Lake Outburst Floods in the Central Himalayan Region",
+    "authors": [
+      {
+        "name": "Risha Fatima",
+        "affil": 1
+      },
+      {
+        "name": "Kirti Sathe",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science, AIMSR, Indore, India"
+    ],
+    "abstract": "Glacial Lake Outburst Floods (GLOFs) are flood events in which a large quantity of water suddenly escapes from a glacial lake. Such events can become highly dangerous in mountainous regions because water can travel quickly through narrow valleys and affect settlements, roads, bridges, and other infrastructure located downstream. Changes in temperature and precipitation can influence glacier melting and the amount of water stored in glacial lakes, making regular observation of these areas important. Mondal et al. (2026) reviewed research on GLOFs in the Central Himalayan region covering the period from 2000 to 2024. Their review considered 68 research papers and examined patterns related to the occurrence, location, intensity, and effects of GLOF events. The study also discussed the usefulness of remote sensing for observing glacial lakes and identifying changes associated with flood events. Taking this research as a foundation, this paper presents a proposed AI- and IoT-based GLOF Early Warning and Protective System. The proposed system would collect real-time environmental information using sensors installed around suitable locations. Parameters such as lake water level, temperature, rainfall, pressure, and ground movement could be monitored. AI and Machine Learning could then examine these readings together to identify abnormal patterns and estimate the level of risk. When the estimated risk becomes serious, the system could send warnings to local communities and disaster-management authorities through different communication channels. In addition to early warning, this paper proposes a physical flood-deflection and flow-control mechanism that could help reduce the effect of floodwater on selected vulnerable infrastructure. The proposed framework aims to combine monitoring, intelligent analysis, rapid communication, evacuation support, and physical risk reduction within one system.",
+    "keywords": "Glacial Lake Outburst Flood, GLOF, Artificial Intelligence, Internet of Things, Machine Learning, Early Warning System, Central Himalaya, Disaster Management"
+  },
+  "P222.pdf": {
+    "title": "Agricultural Waste-Derived Graphene Oxide: A Review of Synthesis, Characterization and Applications",
+    "authors": [
+      {
+        "name": "Rashi Goswami",
+        "affil": 1
+      },
+      {
+        "name": "Umaiya Sultana",
+        "affil": 1
+      },
+      {
+        "name": "Manan Patidar",
+        "affil": 1
+      },
+      {
+        "name": "Anuja Gawade",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Graphene oxide (GO) has received a large amount of scientific attention, due to its high specific surface area, plenty of oxygenated functionalities, mechanical strength, and surface chemistry. Conventional GO production generally relies on graphite as a carbon source and involves chemical oxidation processes. This review examines the reported use of agricultural residues such as rice husk, sugarcane bagasse, coconut shells, and corn cobs as alternative carbon-rich precursors for graphene-based materials. This review summarizes commonly used characterization techniques, including XRD, Raman spectroscopy, FTIR, SEM/TEM, and TGA for evaluating the structural, chemical, morphological, and thermal properties of the resulting materials. The major challenges related to process optimization, reproducibility, chemical consumption, scale-up, and environmental assessment are also discussed.",
+    "keywords": "Graphene oxide, Agricultural waste valorization, biomass carbonization, modified Hummers method, circular bioeconomy, environmental remediation, nanomaterials"
+  },
+  "P223.pdf": {
+    "title": "ClipGen: Multimodal LLM-Based Semantic Video Segmentation and Speaker-Aware Reframing for Automated Short-Form Video Generation",
+    "authors": [
+      {
+        "name": "Yug Atre",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "The exponential growth of short-form video platforms has created an urgent demand for automated tools that convert long-form content into engaging, platform-ready clips. Existing solutions largely rely on simplistic scene-change detection or fixed center-cropping strategies that fail to preserve the visual focus on active speakers. This paper presents ClipGen, an end-to-end AI-assisted video processing system that integrates speech recognition, large language model (LLM) semantic analysis, multimodal active-speaker detection, and dynamic vertical reframing into a unified pipeline. ClipGen accepts local uploads or YouTube URLs, transcribes audio using Faster-Whisper with word-level timestamps, identifies highlight segments through LLM-driven reasoning with a deterministic content-density fallback, and renders short-form clips in both 16:9 and 9:16 aspect ratios. For vertical output, the system employs MediaPipe-based multi-face tracking, Pyannote speaker diarization, and mouth aspect ratio (MAR) analysis to compute a fused active-speaker score, enabling temporally smooth dynamic cropping around the current speaker. Word-level captions are generated and burned into the output via FFmpeg. The backend, built on FastAPI with PostgreSQL and Cloudinary, is containerized using Docker. Experimental evaluation on a diverse corpus of podcast, lecture, and interview videos demonstrates that ClipGen produces semantically coherent clips with accurate speaker-focused reframing, reducing manual editing time by approximately 85%. The system's modular fallback architecture ensures robustness under varying input conditions.",
+    "keywords": "Short-form video, active speaker detection, multimodal fusion, dynamic reframing, automatic speech recognition"
+  },
+  "P224.pdf": {
+    "title": "Nano-Integrated Internet-of-Things (IoT) for Next-Generation Smart Healthcare",
+    "authors": [
+      {
+        "name": "Harshvardhan Singh Chauhan",
+        "affil": 1
+      },
+      {
+        "name": "Vanya Nayak",
+        "affil": 1
+      },
+      {
+        "name": "Yashaswi Agrawal",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies & Research, Indore, India"
+    ],
+    "abstract": "The advent of science and technology has made an individual's life very safe, more reliable, and easier. However, it has also given rise to various lifestyle diseases and reduced normal life expectancy. Therefore, to combat major diseases, the first step is detecting them. But, due to limited technology at various health centres, it becomes very difficult to detect these diseases. Currently, the Internet of Things (IoT) has emerged as a solution to tackle these kinds of limitations. With the implications of IoT in various healthcare settings, it becomes easy to detect the onset of any disease as it simply tracks the metabolites present in the body and converts them into readable outputs. This mini review article critically evaluates selected nanobiosensor systems for comparing various sensing performances, connected healthcare monitoring, and validation evidence.",
+    "keywords": "Internet of Things; Nanobiosensors; Internet of Medical Things; Remote patient monitoring; Wearable Biosensors; Smart Healthcare"
+  },
+  "P225.pdf": {
+    "title": "A Fair and Explainable Multi-Stage Early Warning Framework for Student Academic Risk Prediction and Personalized Intervention Recommendation",
+    "authors": [
+      {
+        "name": "Bhavna Mishra",
+        "affil": 1
+      },
+      {
+        "name": "Aastha Chouhan",
+        "affil": 1
+      },
+      {
+        "name": "Ajinkya Sukhtankar",
+        "affil": 1
+      },
+      {
+        "name": "Akshara Shukla",
+        "affil": 1
+      },
+      {
+        "name": "Akshat Parikh",
+        "affil": 1
+      },
+      {
+        "name": "Akshat Chourasiya",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Student dropout is a critical challenge in higher education, requiring timely identification of students who may be at risk and appropriate academic intervention. This paper proposes a multi-stage, explainable, and intervention-oriented machine learning framework for student dropout risk prediction and personalized intervention. The framework progressively updates student risk using information available at enrollment, after the first semester, and under a full-information setting. Multiple machine learning models, including Logistic Regression, Decision Tree, Random Forest, Support Vector Machine, XGBoost, LightGBM, and CatBoost, are evaluated across the three prediction stages. Experimental evaluation is conducted using the UCI Predict Students' Dropout and Academic Success dataset comprising 4,424 student records and 36 predictive features. The results show that prediction performance improves as additional academic information becomes available. The framework further maps risk estimates and explanatory factors to personalized academic interventions, including remedial support, course-specific assistance, and faculty mentoring. The proposed approach provides an integrated prediction–explanation–risk assessment–intervention pipeline for supporting early and data-driven student retention decisions.",
+    "keywords": "Student dropout prediction, machine learning, educational data mining, CatBoost, XGBoost, explainable artificial intelligence, SHAP, probability calibration, fairness, counterfactual analysis, personalized intervention"
+  },
+  "P227.pdf": {
+    "title": "Therapeutic Modulation of ER–Mitochondrial Crosstalk in Diabetes-Associated Cancer: A Mechanistic and Translational Framework",
+    "authors": [
+      {
+        "name": "Mansana Jhinkwan",
+        "affil": 1
+      },
+      {
+        "name": "Devyani Gaur",
+        "affil": 1
+      },
+      {
+        "name": "Namish Dheer",
+        "affil": 1
+      },
+      {
+        "name": "Pratibha Chauhan",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Diabetes-associated cancer emerges from the convergence of metabolic stress, chronic inflammation, altered insulin/IGF signaling, and tumor-specific metabolic plasticity. A potentially actionable interface linking these processes is the mitochondria-associated endoplasmic reticulum membrane (MAM), where endoplasmic reticulum (ER) and mitochondrial functions are coordinated through calcium transfer, lipid exchange, redox signaling, organelle dynamics, autophagy, and apoptosis. This paper develops a mechanistic framework for understanding how insulin resistance, hyperglycemia, dyslipidemia, and persistent ER stress can remodel ER–mitochondrial communication and thereby alter tumor fitness. Particular attention is given to the IP3R–GRP75–VDAC1 complex, mitochondrial calcium uniporter (MCU), SERCA, MFN-family proteins, VAPB–PTPIP51, BAP31–FIS1, FATE1, and the PERK/ATF4/CHOP and IRE1/XBP1 stress pathways. Rather than assuming that stronger or weaker MAM coupling is universally beneficial, the analysis argues for a context-dependent “stress-threshold” model in which the same contact-site pathway can sustain tumor metabolism at one level of activity and trigger mitochondrial calcium overload or apoptosis at another. Evidence from diabetes models, hepatocellular carcinoma, ovarian cancer, breast cancer, and colorectal cancer is integrated with emerging therapeutic approaches, including antidiabetic drug repurposing, MAM-protein modulation, calcium reprogramming, ER-stress manipulation, and combination therapy. The paper identifies a translational gap: direct clinical validation of MAM-directed treatment in diabetes-associated cancer remains limited despite strong mechanistic and preclinical rationale. A biomarker-guided strategy based on MAM dependence, metabolic phenotype, and therapeutic pressure is proposed.",
+    "keywords": "ER–mitochondrial crosstalk, mitochondria-associated membranes, diabetes, insulin resistance, cancer metabolism, calcium signaling, ER stress, UPR, metformin, therapeutic resistance"
+  },
+  "P228.pdf": {
+    "title": "Intelligent Surveillance for Smart Cities: A Hybrid Edge-Cloud Architecture for Real-Time Accident Detection and Emergency Response",
+    "authors": [
+      {
+        "name": "Arohi Kate",
+        "affil": 1
+      },
+      {
+        "name": "Vandana Kate",
+        "affil": 1
+      },
+      {
+        "name": "Sushma Khatri",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science & Engineering, Acropolis Institute of Technology and Research (AITR), Indore, India"
+    ],
+    "abstract": "Road accidents represent a critical public health challenge, with delayed emergency response significantly impacting survival rates during the critical “golden hour” following incidents. Current surveillance systems in smart cities are predominantly passive, requiring manual monitoring and reactive incident reporting. This research proposes an intelligent surveillance architecture that transforms existing CCTV infrastructure through edge computing and machine learning-based incident detection. The system automatically identifies accidents in real-time (< 2 seconds), classifies severity using multi-factor analysis, and routes automated alerts to the nearest trauma centers and emergency services. Evaluated on standard datasets and simulated scenarios, the system achieves 92% accident detection accuracy with < 5% false positive rate while reducing evidence search time by 95%. The proposed solution addresses the critical gap between incident occurrence and emergency response without requiring replacement of existing surveillance infrastructure, making it immediately deployable in modern smart cities.",
+    "keywords": "Smart Cities, Computer Vision, Edge Computing, Emergency Response, Real-Time Detection, Public Safety, NVIDIA Jetson, YOLOv8"
+  },
+  "P230.pdf": {
+    "title": "Detecting Cancer Before Clinical Symptoms: The Emerging Role of Liquid Biopsy",
+    "authors": [
+      {
+        "name": "Sandesh Singh Thakur",
+        "affil": 1
+      },
+      {
+        "name": "Varuni Dasture",
+        "affil": 1
+      },
+      {
+        "name": "Anuja Rameshchand Adbhai",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Biosciences, Acropolis Institute of Management Studies and Research, Indore, India"
+    ],
+    "abstract": "Today world’s mortality rate is ~0.76% and in the contribution of cancer the rate goes to ~9.9%. The main cause of the death still remains the cancer, and the outcome largely depends on catching the disease early. Despite the symptoms appear, most tumours have reached an advanced stage in which treatment works effective, and conventional screening tools often miss early cancers or carry limiting costs and risks. Liquid biopsy fills this gap by detecting molecular signals — cell-free DNA, circulating tumour DNA, circulating tumour cells, exosomes, and microRNAs — that tumours shed into blood and other body fluids before clinical signs develop. This paper focuses on the biology basis of these molecular footprints, from early tumour evolution through the technologies used to detect them, including PCR-based assays, next-generation sequencing, and methylation and fragmentomic analysis. We review liquid biopsy's clinical progress in colorectal, lung, breast, pancreatic, and ovarian cancer, and its emerging role in Multi-Cancer Early Detection (MCED) testing. It also describes the current barriers to routine clinical use — sensitivity limits for early-stage tumours, cost, standardization, and the need for larger validation studies — and how artificial intelligence is beginning to improve the prediction and diagnostic accuracy. We conclude the paper by discussing what it would take to move oncology from reactive treatment after diagnosis toward predictive, pre-symptomatic detection.",
+    "keywords": "Liquid biopsy; ctDNA; cfDNA; Circulating tumour cells; MCED; Early cancer diagnosis; Exosomes; Precision oncology"
+  },
+  "P233.pdf": {
+    "title": "Numerical Investigation of Droplet-Size-Dependent Aerodynamic Transport for Water-Based Dust Suppression",
+    "authors": [
+      {
+        "name": "Ayaan Sayyed",
+        "affil": 1
+      },
+      {
+        "name": "Dev Makati",
+        "affil": 1
+      },
+      {
+        "name": "Tanishq Shah",
+        "affil": 1
+      },
+      {
+        "name": "Ravi Terkar",
+        "affil": 1
+      },
+      {
+        "name": "Swati Donde",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Mechanical Engineering, MPSTME, NMIMS, Mumbai, India"
+    ],
+    "abstract": "Water-based dust-suppression systems rely on the transport of water droplets through air to interact with airborne particulate matter. Understanding the aerodynamic response of individual droplets is therefore important for interpreting spray transport and designing effective dust-suppression systems. This study presents a numerical investigation of transient monodisperse water-droplet transport using an Eulerian– Lagrangian CFD-DPM framework in OpenFOAM 8. Droplet diameter is isolated as the principal variable, and its influence on velocity decay, particle Reynolds number, drag coefficient, velocity retention, and axial transport is examined under controlled computational conditions. To strengthen the physical interpretation of the simulations, the study introduces a dimensionless transport characterization based on a drag-consistent effective response time, normalized time, velocity retention, and normalized axial transport. Numerical timestep sensitivity is examined, and an analytical droplet-velocity model is used as an independent reference for verification. The resulting framework separates aerodynamic transport from dust-capture mechanisms and provides a basis for subsequent system-level investigations of spray effectiveness, water consumption, coverage, and energy requirements.",
+    "keywords": "Dust suppression, droplet transport, CFD-DPM, discrete phase model, aerodynamic drag, droplet diameter, velocity retention, OpenFOAM"
+  },
+  "P236.pdf": {
+    "title": "MDETIM: A Graph Neural Network Framework for Digital Quotient Assessment and Optimization in Workforce Analytics",
+    "authors": [
+      {
+        "name": "Anant Lokhande",
+        "affil": 1
+      },
+      {
+        "name": "Ajit Kumar Pundge",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science, Ajeenkya D Y Patil University, Pune, India"
+    ],
+    "abstract": "The recent tendency towards the digitalization of current workplaces calls for a unique method of assessing and developing the digital skills of employees. In our research paper, we present a new framework MDETIM that is focused on the measurement of DQ using DQ measurement and classification of DQ using the Graph Convolutional Networks (GCNs). This framework includes the following stages: Measuring (M) of DQ regarding LMS engagement, online activity, social collaboration, and assessment dimensions; Defining (D) of graph representation of the interaction and similarity of the employees concerning certain characteristics; Evaluating (E) DQ classification using multi-layer GCN; and Transforming & Maximizing (TM) DQ by offering the methods to develop it. We used artificial data related to organizational metrics for conducting an experiment. The results of our experiment have shown that the accuracy of the GCN model was equal to 89.00%, with weighted precision, recall, and F1-score higher than 0.88. Thus, using this framework, one can determine the factors of DQ and develop it. The results provide preliminary evidence of the feasibility of graph-based deep learning for Digital Quotient assessment under the evaluated synthetic workforce setting.",
+    "keywords": "Digital Quotient, Graph Convolutional Networks, Workforce Analytics, Digital Readiness, Graph Neural Networks, Performance Matrix"
+  },
+  "P237.pdf": {
+    "title": "KISAAN: An AI-Powered Autonomous Farm Inspection Rover for Real-Time Crop Health Monitoring",
+    "authors": [
+      {
+        "name": "Shubh Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Ananya Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Lovekush Nagda",
+        "affil": 1
+      },
+      {
+        "name": "Ankita Goswami",
+        "affil": 1
+      },
+      {
+        "name": "Sweta Gupta",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of CSE-Cyber Security, AITR, Indore, India"
+    ],
+    "abstract": "Small and marginal farmers in India largely depend on manual field inspection to detect pest infestation, soil imbalance, and irrigation deficits, causing delayed intervention and avoidable crop loss. This paper proposes KISAAN, a low-cost autonomous ground rover for real-time crop-health monitoring. The rover combines GPS/LiDAR navigation, an edge-AI vision unit, and NPK/pH/moisture soil sensors, transmitting data over 4G LTE with LoRa fallback for offline resilience. A YOLOv10 model fine-tuned on an Indian-crop dataset identifies pest and weed hotspots, while a canopy-density model estimates yield and a soil-moisture gradient model prioritizes irrigation. Farmers receive zone-wise health reports via a multilingual app with WhatsApp/SMS delivery. A dual booking/purchase business model is proposed to serve both marginal and large landholdings, with projected feasibility analysis indicating a payback period of approximately 45 days under the service model. The design is structured for interoperability with PM-KISAN, PMFBY, and PM Krishi Sinchai Yojana, positioning KISAAN as a scalable extension of India's digital-agriculture ecosystem.",
+    "keywords": "Precision Agriculture, Autonomous Rover, YOLOv10, Edge AI, IoT, Crop Monitoring"
+  },
+  "P238.pdf": {
+    "title": "AROGYAJAL: AI and IoT-Enabled Framework for Water Safety and Disease Prevention",
+    "authors": [
+      {
+        "name": "Priyanshu Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Lovekush Nagda",
+        "affil": 1
+      },
+      {
+        "name": "Shubh Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Kshitij Chitranshi",
+        "affil": 1
+      },
+      {
+        "name": "Ishan Raut",
+        "affil": 2
+      },
+      {
+        "name": "Riya Dhakad",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of CSE-Cyber Security, AITR",
+      "Department of CSIT, AITR, Indore, India"
+    ],
+    "abstract": "This project introduces a low-cost, easy-to-scale Smart Health Surveillance and Early Warning System aimed at preventing water-borne diseases in rural and tribal regions. It uses inexpensive sensors to check important water quality factors like pH, turbidity, and temperature. Local health workers use a simple, multilingual mobile app to share health information. By matching sensor data with health reports, the system can spot early signs of disease outbreaks such as diarrhea, cholera, and typhoid. The system allows data to be collected even without internet and automatically uploads it when connectivity is available. Automatic alerts are sent to health workers and community leaders so they can act quickly. By combining sensor monitoring, community involvement, and easy-to-use technology, the system boosts awareness, improves public health actions, and lowers the effect of diseases. Experimental results show that the system detects water-borne illnesses early, speeds up responses, and enhances health care in remote areas, proving its effectiveness in safeguarding at-risk communities.",
+    "keywords": "IoT, Water Quality, Disease Detection, Health Surveillance, Rural Healthcare"
+  },
+  "P243.pdf": {
+    "title": "TwinVerse: A National Critical Infrastructure Digital Twin Platform for Real-Time Monitoring, Predictive Maintenance, and Disaster Resilience",
+    "authors": [
+      {
+        "name": "Zannat",
+        "affil": 1
+      },
+      {
+        "name": "Shailja Saini",
+        "affil": 1
+      },
+      {
+        "name": "Aditya Singh",
+        "affil": 1
+      },
+      {
+        "name": "Kavya Shaurya",
+        "affil": 1
+      },
+      {
+        "name": "Vansh",
+        "affil": 1
+      },
+      {
+        "name": "Harsh Chaudhary",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "University Institute of Engineering, Chandigarh University, Mohali, India"
+    ],
+    "abstract": "The ever-mounting risk of critical infrastructure systems is due to degradation of equipment, system failures and natural disasters. Current monitoring can be asset-centric and may not be able to evaluate the interdependency of infrastructure and provide a coordinated approach to infrastructure resiliency. In this paper, we propose a modular digital-twin platform called TwinVerse that integrates sensor-based monitoring, artificial intelligence (AI), predictive maintenance, anomaly detection, and disaster-resilience assessment. The proposed framework consists of sensor data preprocessing, supervised machine-learning-based classification of sensor data, unsupervised anomaly detection, digital-twin state synchronization, and infrastructure dependency modelling. Random Forest, Histogram-based Gradient Boosting, Isolation Forest, and the combination of supervised risk prediction and anomaly scores are used for conducting experiments based on the pump-sensor data. The F1 score for the proposed hybrid was 97.81% and the ROC-AUC was 0.9978, while the Histogram-based Gradient Boosting was 97.84% and 0.9983 respectively. The results revealed that the classification of operational state performance was good, but the hybrid approach did not beat any baseline. The framework is also the basis for simulation of disruptions to the infrastructure, prioritization of maintenance and recovery scenarios. The lack of observations of critical failures and simulated disaster scenarios are limitations in conclusions about real-world resilience. TwinVerse therefore offers a first structure to integrate asset-level intelligence and infrastructure-level decision support, which must be tested on a national level before it can be fully implemented.",
+    "keywords": "Digital twin, critical infrastructure, predictive maintenance, anomaly detection, machine learning, disaster resilience, Internet of Things, infrastructure monitoring"
+  },
+  "P245.pdf": {
+    "title": "NaviSight: An Edge AI and IoT-Based Smart Assistive Navigation System for Visually Impaired Individuals",
+    "authors": [
+      {
+        "name": "Kshitij Chitranshi",
+        "affil": 1
+      },
+      {
+        "name": "Priyanshu Sharma",
+        "affil": 1
+      },
+      {
+        "name": "Riya Dhakad",
+        "affil": 1
+      },
+      {
+        "name": "Jahanvi Patidar",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Department of Computer Science (Cybersecurity), Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Visual impairment afflicts more than 2.2 billion people across the world. Many visually impaired individuals depend on the old white cane as their mobility assistance tool. Even though the white cane is inexpensive and reliable, it has very limited functionality, offering nothing more than short-range ground-level contact and cannot help with object detection, routing assistance, or emergency communications. Some smart cane solutions such as WeWalk Smart Cane and OrCam MyEye have been introduced recently but are rather expensive and thus out of the budget of most of visually impaired individuals in low- and middle-income countries. In this paper, we propose the concept of a low-cost NaviSight navigation assistance system based on the combination of an ESP32 microprocessor, proximity sensors, and haptic-audio feedback. This solution is presented as a cyber-physical system, which utilizes multiple proximity sensors in order to provide real-time obstacle detection and warning to the user via vibration and voice, and an additional connected mobile application for cloud logging and emergency assistance. Since the system discussed herein is at the design and prototyping stage, this paper highlights the system architecture, hardware and software design, functioning, sensor fusion and decision-making mechanism, cost and comparative analysis, and expected results and criteria of evaluation instead of the results of experimentation. The proposed system design suggests that an effectively usable obstacle detection system could be built in India at a cost of about ₹1,800–2,600 using prototype quantity parts, one to two magnitudes cheaper than any commercially available smart cane.",
+    "keywords": "Assistive technology, Edge AI, Internet of Things, cyber-physical systems, embedded systems, sensor fusion, obstacle detection, ESP32, visually impaired navigation"
+  },
+  "P246.pdf": {
+    "title": "RakhtSaathi: An AI and Blockchain-Enabled Real-Time Blood Donation Matching and Verification Platform",
+    "authors": [
+      {
+        "name": "Utkarsh Singh",
+        "affil": 1
+      },
+      {
+        "name": "Kuldeep Kelde",
+        "affil": 2
+      },
+      {
+        "name": "Shubh Sharma",
+        "affil": 3
+      }
+    ],
+    "affiliations": [
+      "Dept. of CSE-AIML, AITR",
+      "Dept. of CSIT, AITR",
+      "Dept. of CSE(CYB), AITR, Indore, India"
+    ],
+    "abstract": "This paper presents RakhtSaathi, a real-time, geolocation-aware blood donation matching platform designed to reduce response time in emergency transfusion scenarios. The system indexes donors using geohash-based spatial partitioning and filters eligible donors through an automated 90-day medical cooldown rule, removing the need for manual administrative screening. A critical-priority “SOS” request pathway pushes distinct high-urgency alerts to nearby compatible donors and exposes a live map-based tracking view of the responding donor, similar in interaction design to on-demand ride-hailing applications. Upon completion of a donation, a Cloud Function automatically updates donor eligibility, generates a SHA-256 hashed donation certificate, and anchors the hash on the Polygon blockchain, enabling independent, tamper-evident verification by third parties such as employers or partner NGOs without requiring trust in the platform's own database. A supporting AI-based feedback analyzer screens post-donation reports for scam-pattern language, flagging suspicious requests for administrator review through a governance dashboard. Institutional revenue is generated through hospital SaaS subscriptions, NGO drive-hosting fees, and corporate CSR partnerships, while the core donor-to-requester matching service remains free. Preliminary evaluation of the matching engine and blockchain verification pipeline indicates substantial improvements in donor response latency and end-to-end certificate verification time relative to manual, phone-call-driven coordination workflows, supporting the viability of RakhtSaathi as a scalable emergency blood-donation infrastructure for urban and semi-urban Indian cities.",
+    "keywords": "Blood Donation, Emergency Response, Geohash-Based Matching, Blockchain Verification, AI-Driven Content Moderation, Healthcare Technology"
+  },
+  "P247.pdf": {
+    "title": "TerraQuery: A Multi-Agent Foundation Framework for Autonomous Planetary Reasoning, Multi-Source Evidence Fusion, and Verifiable Geospatial Intelligence",
+    "authors": [
+      {
+        "name": "Aditya Kumrawat",
+        "affil": 1
+      },
+      {
+        "name": "Aarushi Shah",
+        "affil": 1
+      },
+      {
+        "name": "Divya Joshi",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science & Engg., Acropolis Inst. of Tech. & Research, Indore, India"
+    ],
+    "abstract": "Earth Observation (EO) satellite constellations generate petabytes of multi-spectral, synthetic aperture radar (SAR), and thermal data daily. However, transforming raw orbital telemetry into verified, actionable intelligence remains bounded by manual geographic information systems (GIS) workflows, isolated spectral index calculators, and high-latency expert analysis. In this paper, we introduce TerraQuery, a multi-agent cognitive architecture for autonomous, reproducible, and verifiable planetary reasoning. TerraQuery orchestrates a stateful multi-agent directed graph (structured as 14 operational nodes N01–N14 across 5 execution phases) combining multi-model foundation agents, Google Earth Engine's 64-dimensional AlphaEarth foundation embeddings, NASA Earthdata Model Context Protocol (MCP) services, and deterministic multi-spectral processing. Rather than relying on ungrounded generative summaries, the system integrates a literature-calibrated Bayesian Signal Consensus engine that dynamically updates posterior anomaly probabilities via Platt-scaled agent factors and Gaussian spectral likelihood ratios. Every analytical granule, array computation, and intermediate state transition is cryptographically anchored in an immutable SHA-256 evidence chain of custody. We evaluate TerraQuery across an empirical multi-hazard panel of 300 verified geographic regions, including cyclone mangrove dieback in the Irrawaddy Delta, sub-canopy clandestine degradation in the Sundarbans, and urban floodplain inundation in Mumbai. Benchmark results show that TerraQuery achieves an F1-score of 0.860, PR-AUC of 0.962, and reduces expected calibration error by 53.7% relative to uncalibrated LLM probabilities (ECE = 0.1313 vs 0.2835), outperforming ungrounded foundation models while reducing time-to-insight from 48 hours to 59.7 seconds at an operational inference cost of $0.0136 per mission.",
+    "keywords": "Earth Observation, Multi-Agent Systems, LangGraph, AlphaEarth Foundation Models, Bayesian Evidence Fusion, Cryptographic Provenance, Remote Sensing, SHA-256"
+  },
+  "P248.pdf": {
+    "title": "An Efficient Deep Learning Framework for Forest Fire Detection Using CNN and RNN",
+    "authors": [
+      {
+        "name": "Raksha Rangani",
+        "affil": 1
+      },
+      {
+        "name": "Tanvi Mehta",
+        "affil": 1
+      },
+      {
+        "name": "Mayank Raj",
+        "affil": 1
+      },
+      {
+        "name": "Anagha Chougaonkar",
+        "affil": 1
+      },
+      {
+        "name": "Jyoti Pipariya",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of ECE, Acropolis Institute of Tech. & Research, Indore, India"
+    ],
+    "abstract": "Among natural disasters, forest fires stand out for the extensive environmental damage, ecological disruption, and financial losses they cause. Detecting such fires quickly and accurately plays a key role in limiting wildfire destruction and supporting timely emergency responses. In this work, a comparative evaluation of two deep learning architectures — Convolutional Neural Networks (CNN) and Recurrent Neural Networks (RNN) — is carried out for the task of classifying forest fire images, drawing on the FLAME dataset available on Kaggle. The workflow incorporates image preprocessing steps, augmentation strategies, and supervised training to perform binary classification of images into fire and non-fire categories. The CNN model delivered strong results, attaining 98.24% accuracy during training, 96.98% on the validation set, and 97.29% on testing, exceeding the performance of the RNN model, which achieved 89.94%, 92.30%, and 93.18% accuracy respectively on the same three metrics. These findings indicate that CNNs are considerably more capable than RNNs at extracting spatial characteristics from images, translating into superior classification outcomes. Given its efficiency and reliability, the proposed method holds strong potential for real-world deployment in areas such as UAV-based aerial surveillance, IoT-based environmental monitoring, and intelligent systems for wildfire response and management.",
+    "keywords": "Forest Fire Detection, CNN, RNN, Deep Learning, FLAME Dataset, Image Classification, Wildfire Monitoring"
+  },
+  "P250.pdf": {
+    "title": "A Blockchain-Based Trust and Accountability Framework for Secure Human-Centric Cyber-Physical Collaboration in Industry 5.0",
+    "authors": [
+      {
+        "name": "Aafreen Khan",
+        "affil": 1
+      },
+      {
+        "name": "Chirag Sharma",
+        "affil": 1
+      }
+    ],
+    "affiliations": [
+      "Dept. of Computer Science and Engineering, Acropolis Institute of Technology and Research, Indore, India"
+    ],
+    "abstract": "Industry 5.0 calls for automation that keeps human operators in the loop while remaining secure and auditable. Blockchain can provide tamper-evident accountability for human–robot collaboration, but consensus latency is incompatible with the millisecond control cycles of collaborative robots, and this mismatch is not stated as a design constraint in the works we reviewed. This paper proposes a five-layer, edge-assisted blockchain architecture that separates real-time actuation from ledger commitment through a dual-rate control boundary. A fast path performs signature verification and safety checks locally at the edge, while a slow path anchors signed command records through permissioned Byzantine fault-tolerant consensus for audit, alarm, and revocation. We define the threat model, the cryptographic trust chain, the privacy mechanisms, and a dual-path verification algorithm, and derive an analytical latency model that yields explicit design conditions for both paths. A qualitative comparison with recent Industry 5.0 blockchain work and an analysis of challenges and mitigations follow. The evaluation is analytical: no experimental results are reported, and validation on a collaborative-robot testbed is identified as future work.",
+    "keywords": "Blockchain, Industry 5.0, human-robot collaboration, edge computing, Byzantine fault tolerance, zero-knowledge proofs, trust management, cybersecurity"
+  }
+}

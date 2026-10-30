@@ -6,8 +6,8 @@ const SCRAPER_DIR = path.join(process.cwd(), 'scraper');
 const CONFIG_PATH = path.join(SCRAPER_DIR, 'config.json');
 
 const DEFAULT_PARAMS = {
-  CONFERENCE_HEADER: 'International Conference on Advances in Computer Research on Science Engineering and Technology, 2026',
-  FOOTER_URL: 'www.acroset.in',
+  CONFERENCE_HEADER: 'IEEE IGNITE 2.0: Student Research and Professional Awareness Conference',
+  FOOTER_URL: 'https://ieeeignite.in',
   LINE_SPACING_FACTOR: 1.45,
   WORD_SPACING: 1.5,
   TITLE_FONT_SIZE: 12,

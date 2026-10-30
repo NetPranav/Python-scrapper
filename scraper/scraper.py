@@ -40,6 +40,7 @@ try:
 except ImportError:
     import fitz
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from reportlab.lib.colors import black, HexColor
@@ -48,7 +49,8 @@ from reportlab.platypus import (
     Paragraph, Spacer, Flowable, KeepTogether, PageBreak
 )
 from reportlab.pdfgen import canvas as canvas_mod
-from reportlab.pdfbase.pdfmetrics import stringWidth, registerFont
+from reportlab import rl_config
+from reportlab.pdfbase.pdfmetrics import stringWidth, registerFont, registerFontFamily, getFont
 from reportlab.pdfbase.ttfonts import TTFont
 
 # Register custom fonts if available
@@ -66,6 +68,60 @@ def register_custom_fonts():
 register_custom_fonts()
 
 
+# Compiled-output text fonts. The built-in Type 1 Times only covers Latin-1, so symbols
+# such as π, ◦ or ¹ printed as black boxes; an embedded Times New Roman covers them.
+_TIMES_TTF_DIRS = ['/System/Library/Fonts/Supplemental', '/Library/Fonts',
+                   os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts')]
+_TIMES_TTF_FILES = {
+    'regular': ['Times New Roman.ttf', 'times.ttf'],
+    'bold': ['Times New Roman Bold.ttf', 'timesbd.ttf'],
+    'italic': ['Times New Roman Italic.ttf', 'timesi.ttf'],
+    'bold_italic': ['Times New Roman Bold Italic.ttf', 'timesbi.ttf'],
+}
+# Serif fonts used only for single characters the main font lacks (₹ is missing from
+# the macOS Times New Roman)
+_FALLBACK_TTF_FILES = ['STIXTwoText.ttf', 'Nirmala.ttf', 'seguisym.ttf']
+
+
+def _find_font_file(names):
+    for d in _TIMES_TTF_DIRS:
+        for name in names:
+            path = os.path.join(d, name)
+            if os.path.exists(path):
+                return path
+    return None
+
+
+def _register_text_fonts():
+    """Returns (regular, bold, italic, bold_italic, fallback) font names."""
+    paths = {style: _find_font_file(names) for style, names in _TIMES_TTF_FILES.items()}
+    names = ('Times-Roman', 'Times-Bold', 'Times-Italic', 'Times-BoldItalic')
+    if all(paths.values()):
+        try:
+            names = ('TNR', 'TNR-Bold', 'TNR-Italic', 'TNR-BoldItalic')
+            for name, style in zip(names, ('regular', 'bold', 'italic', 'bold_italic')):
+                registerFont(TTFont(name, paths[style]))
+            registerFontFamily('TNR', normal='TNR', bold='TNR-Bold',
+                               italic='TNR-Italic', boldItalic='TNR-BoldItalic')
+        except Exception as e:
+            print(f"Failed to register Times New Roman, using built-in Times: {e}")
+            names = ('Times-Roman', 'Times-Bold', 'Times-Italic', 'Times-BoldItalic')
+    fallback = None
+    path = _find_font_file(_FALLBACK_TTF_FILES)
+    if path:
+        try:
+            registerFont(TTFont('SymbolFallback', path))
+            fallback = 'SymbolFallback'
+        except Exception as e:
+            print(f"Failed to register fallback font {path}: {e}")
+    return names + (fallback,)
+
+FONT_REGULAR, FONT_BOLD, FONT_ITALIC, FONT_BOLD_ITALIC, FONT_FALLBACK = _register_text_fonts()
+# Every canvas page starts by selecting this font; the default (Helvetica) is never embedded,
+# which print preflight checks flag even when no text uses it
+rl_config.canvas_basefontname = FONT_REGULAR
+
+
 # ============================================================
 # CONFIGURATION — loaded from config.json if present
 # ============================================================
@@ -73,11 +129,8 @@ register_custom_fonts()
 def _load_config():
     """Load parameters from config.json, falling back to defaults."""
     defaults = {
-        'CONFERENCE_HEADER': (
-            'International Conference on Advances in Computer '
-            'Research on Science Engineering and Technology, 2026'
-        ),
-        'FOOTER_URL': 'www.acroset.in',
+        'CONFERENCE_HEADER': 'IEEE IGNITE 2.0: Student Research and Professional Awareness Conference',
+        'FOOTER_URL': 'https://ieeeignite.in',
         'LINE_SPACING_FACTOR': 1.45,
         'WORD_SPACING': 1.5,
         'TITLE_FONT_SIZE': 12,
@@ -87,6 +140,18 @@ def _load_config():
         'HEADER_FONT_SIZE': 8.5,
         'FOOTER_URL_FONT_SIZE': 9,
         'FOOTER_PAGE_FONT_SIZE': 10,
+        # Page size and margins in points: A4 plus a 15 mm binding strip on the left, matching
+        # the book's front matter. Gaps tuned on A4 scale with the page height.
+        'PAGE_WIDTH': A4[0] + 15 * mm,
+        'PAGE_HEIGHT': A4[1],
+        'MARGIN_LEFT': 50 + 15 * mm,
+        'MARGIN_RIGHT': 50,
+        'MARGIN_TOP': 70,
+        'MARGIN_BOTTOM': 60,
+        # 2 = pair short abstracts on a page; 1 = every abstract starts on its own page
+        'MAX_PAPERS_PER_PAGE': 2,
+        # Page numbers in the Contents list: 'arabic' (1, 2, 3) or 'roman' (i, ii, iii)
+        'TOC_PAGE_NUMBERS': 'roman',
     }
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
     if os.path.exists(config_path):
@@ -105,23 +170,106 @@ _cfg = _load_config()
 
 CONFERENCE_HEADER = _cfg['CONFERENCE_HEADER']
 FOOTER_URL = _cfg['FOOTER_URL']
+TOC_PAGE_NUMBERS = str(_cfg['TOC_PAGE_NUMBERS']).lower()
+
+
+def to_roman(number):
+    """12 -> 'xii' (lowercase, as used for page numbers)."""
+    out = ''
+    for value, letters in ((1000, 'm'), (900, 'cm'), (500, 'd'), (400, 'cd'), (100, 'c'), (90, 'xc'),
+                           (50, 'l'), (40, 'xl'), (10, 'x'), (9, 'ix'), (5, 'v'), (4, 'iv'), (1, 'i')):
+        while number >= value:
+            out += letters
+            number -= value
+    return out
+
+
+def _load_author_overrides():
+    """Optional manual corrections, keyed by source filename:
+    {"P246.pdf": {"rename": {"Teacher": "Ritika Sen"}}}. A rename applies only when the
+    extracted name matches exactly, so stale entries from another batch are harmless."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'author_overrides.json')
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return {k: v for k, v in json.load(f).items() if not k.startswith('_')}
+    except Exception as e:
+        print(f"  [WARN] Could not load author_overrides.json: {e}")
+        return {}
+
+AUTHOR_OVERRIDES = _load_author_overrides()
+
+
+PAPER_CORRECTIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paper_corrections.json')
+
+
+def apply_paper_corrections(papers, path=PAPER_CORRECTIONS_FILE):
+    """Replace extracted fields with hand-edited ones, keyed by source filename:
+    {"P104.pdf": {"title": ..., "authors": [{"name": ..., "affil": 1}], "affiliations": [...],
+                  "abstract": ..., "keywords": ...}}. Every field is optional."""
+    if not os.path.exists(path):
+        return 0
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            corrections = json.load(f)
+    except Exception as e:
+        print(f"  [WARN] Could not load {os.path.basename(path)}: {e}")
+        return 0
+    def words(p):
+        return set(re.findall(r'[a-z]{4,}', (p.get('title', '') + ' ' + p.get('abstract', '')[:400]).lower()))
+
+    applied = 0
+    for paper in papers:
+        fix = corrections.get(paper.get('source_file'))
+        if not fix:
+            continue
+        # Filenames repeat between batches (P104.pdf ...): only apply to the same paper
+        found, edited = words(paper), words(fix)
+        if found and edited and len(found & edited) / len(found | edited) < 0.4:
+            print(f"  [WARN] {os.path.basename(path)} entry for {paper['source_file']} is for a "
+                  f"different paper (\"{fix.get('title', '')[:50]}\") -- not applied")
+            continue
+        for field in ('title', 'abstract', 'keywords'):
+            if fix.get(field):
+                paper[field] = fix[field]
+        if fix.get('authors'):
+            affiliations = fix.get('affiliations') or []
+            paper['authors'] = [{
+                'name': a['name'],
+                'college': affiliations[a['affil'] - 1] if a.get('affil') and a['affil'] <= len(affiliations) else '',
+                'affil_num': a.get('affil'),
+            } for a in fix['authors']]
+        paper['anomalies'] = [m for m in paper.get('anomalies', [])
+                              if not m.startswith(('Missing affiliation', 'Suspicious author'))]
+        paper['anomalies'].append(f"Text replaced by the edited version in {os.path.basename(path)}")
+        applied += 1
+    return applied
 
 # Deep blue color for header/footer divider lines
 DIVIDER_COLOR = HexColor('#003366')
 
-PAGE_WIDTH, PAGE_HEIGHT = A4  # 595.27 x 841.89 points
-LEFT_MARGIN = 50
-RIGHT_MARGIN = 50
-TOP_MARGIN = 70      # more space for header area
-BOTTOM_MARGIN = 60   # more space for footer area
+PAGE_WIDTH = float(_cfg['PAGE_WIDTH'])
+PAGE_HEIGHT = float(_cfg['PAGE_HEIGHT'])
+PAGE_SIZE = (PAGE_WIDTH, PAGE_HEIGHT)
+LEFT_MARGIN = _cfg['MARGIN_LEFT']
+RIGHT_MARGIN = _cfg['MARGIN_RIGHT']
+TOP_MARGIN = _cfg['MARGIN_TOP']        # space for the header
+BOTTOM_MARGIN = _cfg['MARGIN_BOTTOM']  # space for the footer
 CONTENT_WIDTH = PAGE_WIDTH - LEFT_MARGIN - RIGHT_MARGIN
+# Fixed gaps, headroom and separator sizes below were tuned on A4; they shrink with the page
+LAYOUT_SCALE = PAGE_HEIGHT / A4[1]
 
 # Strict limit: max papers per page
-MAX_PAPERS_PER_PAGE = 2
+MAX_PAPERS_PER_PAGE = int(_cfg['MAX_PAPERS_PER_PAGE'])
 # Non-final pages must use at least this fraction of available height (max 80% whitespace)
 MIN_PAGE_FILL_RATIO = 0.20
 # Conservative headroom so KeepTogether blocks never overflow the frame
-PACKING_HEADROOM_PT = 85.0
+PACKING_HEADROOM_PT = 85.0 * LAYOUT_SCALE
+# The packer searches randomly; a fixed seed keeps the page layout stable between runs
+PACKING_SEED = 2026
+# Vertical gap between Contents entries (pt)
+TOC_ENTRY_GAP = 4.5 * LAYOUT_SCALE
 
 # ────────────────────────────────────────────────────────────
 # TUNABLE SPACING PARAMETERS  (adjust these to control layout)
@@ -179,6 +327,112 @@ def html_escape(text):
             .replace('"', '&quot;'))
 
 
+_SUBSCRIPT_DIGITS_RE = re.compile('[₀-₉]+')
+
+
+def markup_text(text):
+    """Escape text for a Paragraph and route characters the body font lacks:
+    subscript digits (CO₂) become <sub> markup and anything else missing (₹) is
+    drawn in the fallback font instead of as a black box."""
+    escaped = html_escape(text)
+    escaped = _SUBSCRIPT_DIGITS_RE.sub(
+        lambda m: '<sub>' + ''.join(str(ord(c) - 0x2080) for c in m.group()) + '</sub>', escaped)
+    if not FONT_FALLBACK:
+        return escaped
+    try:
+        have = getFont(FONT_REGULAR).face.charToGlyph
+        spare = getFont(FONT_FALLBACK).face.charToGlyph
+    except AttributeError:   # built-in Type 1 font: no cmap to consult
+        return escaped
+    return ''.join(f'<font name="{FONT_FALLBACK}">{ch}</font>'
+                   if ord(ch) > 0x7f and ord(ch) not in have and ord(ch) in spare else ch
+                   for ch in escaped)
+
+
+# ============================================================
+# TEXT TIDYING — artefacts the source PDFs carry into the text
+# ============================================================
+
+_dictionary = None
+
+
+def _dictionary_words():
+    global _dictionary
+    if _dictionary is None:
+        _dictionary = set()
+        for path in ('/usr/share/dict/words', '/usr/share/dict/web2'):
+            if os.path.exists(path):
+                with open(path, encoding='utf-8', errors='ignore') as f:
+                    _dictionary = {w.strip().lower() for w in f}
+                break
+    return _dictionary
+
+
+def _is_dictionary_word(word):
+    words = _dictionary_words()
+    word = word.lower()
+    if word in words:
+        return True
+    for suffix, repl in (('ies', 'y'), ('es', ''), ('s', ''), ('ed', ''), ('ed', 'e'),
+                         ('ing', ''), ('ing', 'e'), ('ly', ''), ('al', '')):
+        if word.endswith(suffix) and word[:-len(suffix)] + repl in words:
+            return True
+    m = re.match(r'(.*([b-df-hj-np-tv-z]))\2(?:ed|ing)$', word)   # controlled -> control
+    return bool(m and m.group(1) in words)
+
+
+_BROKEN_HYPHEN_RE = re.compile(r'\b([A-Za-z0-9]+)- +([A-Za-z0-9]+)')
+
+
+def fix_broken_hyphens(text):
+    """Repair words the source broke at a line end: "chal- lenge" -> "challenge",
+    "zero- shot" -> "zero-shot". Suspended hyphens ("AI- and IoT-based") are kept."""
+    def repl(m):
+        left, right = m.group(1), m.group(2)
+        if right.lower() in ('and', 'or', 'to', 'nor', 'as', 'vs'):
+            return m.group(0)
+        if not right[0].islower() or not left.isalpha():
+            return f'{left}-{right}'
+        joined = left + right
+        if re.search(r'\b%s\b' % re.escape(joined), text, re.I):
+            return joined
+        if re.search(r'\b%s-%s\b' % (re.escape(left), re.escape(right)), text, re.I):
+            return f'{left}-{right}'
+        if _dictionary_words():
+            return joined if _is_dictionary_word(joined) else f'{left}-{right}'
+        return m.group(0)
+    return _BROKEN_HYPHEN_RE.sub(repl, text)
+
+
+def tidy_text(text):
+    """Clean-up shared by abstracts and keywords."""
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)            # markdown bold: **ClipGen**
+    text = re.sub(r'\s?◦\s?C\b', ' °C', text)                # ◦ used as a degree sign
+    text = re.sub(r"``(.+?)''", r'“\1”', text)               # LaTeX quotes
+    text = re.sub(r'\(\s+', '(', text)
+    text = re.sub(r'\s+([,.;:])(?=\s|$)', r'\1', text)       # "husk ,sugarcane" / "setting ."
+    text = re.sub(r',(?=[A-Za-z])', ', ', text)
+    text = re.sub(r'(?<=[a-z]{3})\.(?=(?:The|This|These|It|In|We|Our)\b)', '. ', text)  # "processes.This"
+    text = re.sub(r'(?<=\w) -(?=[a-z])', '-', text)          # "carbon -rich"
+    text = fix_broken_hyphens(text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def tidy_keywords(keywords):
+    keywords = tidy_text(keywords).lstrip('-–—:.* ').strip()
+    return keywords[:1].upper() + keywords[1:]
+
+
+def tidy_abstract(abstract, keywords=''):
+    if keywords:
+        # Keyword list pasted onto the end of the abstract ("... future. **Self-heating lunch box ...")
+        m = re.search(r'\*\*\s*' + re.escape(keywords[:25]), abstract)
+        if m and m.start() > len(abstract) * 0.6:
+            abstract = abstract[:m.start()]
+    abstract = tidy_text(abstract).replace('**', '')
+    return abstract[:1].upper() + abstract[1:]
+
+
 CITIES = {
     'rajkot', 'jaipur', 'kishangarh', 'pilani', 'kanyakumari', 'chennai', 'muscat',
     'vaddeswaram', 'bhopal', 'gwalior', 'vijayawada', 'bhimavaram', 'jalandhar', 'indore',
@@ -190,6 +444,10 @@ CITIES = {
 }
 
 
+_COUNTRY_STATE_RE = re.compile(
+    r'\b(?:' + '|'.join(re.escape(p) for p in sorted(COUNTRIES | STATES, key=len, reverse=True)) + r')\b')
+
+
 def is_location_line(text):
     """
     Detect city/country/state lines in the author section.
@@ -199,15 +457,15 @@ def is_location_line(text):
     if clean in CITIES:
         return True
 
-    # Check country names
-    for country in COUNTRIES:
-        if country in clean:
-            return True
+    # "Central University of Rajasthan" is an affiliation, not a location
+    if re.search(r'\b(?:university|institute|college|school|department|dept|faculty|'
+                 r'academy|centre|center|campus|laboratory)\b', clean):
+        return False
 
-    # Check state names
-    for state in STATES:
-        if state in clean:
-            return True
+    # Whole-word country/state match (substring matching dropped names like
+    # "Mausam" (usa), "Shukla" (uk) and "Kiran" (iran))
+    if _COUNTRY_STATE_RE.search(clean):
+        return True
 
     # Pattern: "City, Country" — short text with comma, no email
     if ',' in text and len(text.strip()) < 40 and '@' not in text:
@@ -266,6 +524,12 @@ def smart_join_parts(parts):
         # If current line starts with ')' → closing bracket continuation
         elif curr and curr[0] == ')':
             result += curr
+        # Word-wrapped field names: "Institute of Management" / "Studies and Research",
+        # "Department of Computer" / "Science(Artificial Intelligence)"
+        elif (re.search(r'\b(?:management|computer|information|electronics|electrical|'
+                        r'mechanical|civil|applied|life|data)$', prev, re.I)
+              and re.match(r'(?:studies|science|sciences|technology|engineering)\b', curr, re.I)):
+            result += ' ' + curr
         else:
             # Likely a new entity (e.g., department → university)
             result += ', ' + curr
@@ -277,9 +541,10 @@ INSTITUTION_RE = re.compile(
     r'\b(?:department|dept\.?|university|institute|college|school|faculty|academy|'
     r'center|centre|kendra|krishi|engineering|engg\.?|technology|campus|vidyapeetham|vidhyapeetham|vishwavidhyalaya|'
     r'deemed|laboratory|division|vet\.?|inst\.?|global|alliance|symbiosis|medicaps|vishwa|'
-    r'lovely|saveetha|jain|atlas|vivekananda|acropolis|manipal|sage|ggits|skitm|sciences|'
+    r'lovely|saveetha|atlas|vivekananda|acropolis|manipal|sage|ggits|skitm|sciences|'
     r'communication|information|physics|chemistry|mathematics|research|foundation|education|'
-    r'veltech|klef|amity|chandigarh|proudyogiki|r&d|cse|ece|eee|it|ai|ds)\b',
+    r'veltech|klef|amity|chandigarh|proudyogiki|r&d|cse|ece|eee|it|ai|ds|'
+    r'enterprises?|ltd|limited|pvt|inc|corporation|testing)\b',
     re.I,
 )
 
@@ -306,15 +571,29 @@ NON_PERSON_WORDS = {
     'vidhyapeetham', 'klef', 'veltech', 'jain', 'medicaps', 'amity', 'chandigarh', 'symbiosis',
     'proudyogiki', 'r&d', 'cse', 'ece', 'eee', 'dr', 'prof', 'computer', 'electronics',
     'applied', 'sciences', 'data', 'science', 'technology', 'management', 'kendra', 'krishi',
-    'k', 'l', 'e', 'f'
+    'k', 'l', 'e', 'f', 'asst', 'student', 'students', 'developer', 'sem', 'msc', 'cs', 'teacher'
 }
+
+# Template leftovers and contact labels that are never names or affiliations
+AUTHOR_NOISE_RE = re.compile(
+    r'^(?:e-?mail(?:\s*id)?\s*:?.*|\*?\s*note\s*:.*|line\s+\d+\s*:.*|.*corresponding\s+author.*'
+    r'|\d{4}-\d{4}-\d{4}-\d{3}[\dX]'          # ORCID
+    r'|\(?(?=[A-Z0-9]*\d{4})[A-Z0-9]{8,}\)?'      # roll numbers "(0827CD23106)"
+    r'|\.?[a-z]{2,5}(?:\.[a-z]{2,3})+)$',          # split email tail ".ac.in"
+    re.I)
 
 
 def clean_author_name(name: str) -> str:
     """Strip superscript affiliation markers from author names."""
+    name = re.sub(r'^\s*name\s*:\s*', '', name, flags=re.I)            # "Name : Risha Fatima"
+    name = re.sub(r'^[,;&\s]*(?:and\s+)?', '', name)                   # ", and Yashaswi Agrawal"
+    name = name.strip().rstrip('.,;') if re.search(r'[a-z]{2}\.$', name) else name
     name = re.sub(r'[\d*†‡§¶\[\]]+$', '', name).strip()
     name = re.sub(r'^[\d*†‡§¶\[\]]+\s*', '', name).strip()
     name = re.sub(r'(\w)[\d*†‡§¶]+(?=\s|,|$)', r'\1', name).strip()
+    name = re.sub(r'^(?:mr|mrs|ms|miss)\.?\s+', '', name, flags=re.I)  # keep Dr./Prof., drop Ms./Mr.
+    # Capitalise words typed all lowercase ("kirti sathe" → "Kirti Sathe")
+    name = ' '.join(w[0].upper() + w[1:] if w.islower() else w for w in name.split())
     return name
 
 
@@ -349,6 +628,13 @@ def is_person_name(text):
         return False
     if re.match(r'^[\d\s\W]+$', t):
         return False
+    # Names never carry digits, label colons, or bracketed acronyms ("(A.I.M.S.R)")
+    if re.search(r'\d', t) or ':' in t or AUTHOR_NOISE_RE.match(t):
+        return False
+    if re.match(r'^\(.*\)$', t) or re.match(r'^(?:[A-Z]\.){2,}$', t.replace(' ', '')):
+        return False
+    if re.fullmatch(r'[A-Z&]{3,}', t):
+        return False  # lone institution acronym ("AITR", "GIDA")
     words = [w.lower().strip('.,()[]:;') for w in t.split() if w.strip('.,()[]:;')]
     if not words:
         return False
@@ -359,119 +645,246 @@ def is_person_name(text):
     return True
 
 
+def _span_center(s):
+    return (s.get('origin_x', 0) + s.get('end_x', s.get('origin_x', 0))) / 2.0
+
+
 def _cluster_spans_by_column(section_spans, x_gap=90):
-    """Group author-section spans into vertical columns (multi-column PDF layouts)."""
+    """Group author-section spans into vertical columns (multi-column PDF layouts).
+    Uses line centres, since author blocks are usually centred within their column."""
     valid = [s for s in section_spans if s['text'].strip()]
     if not valid:
         return []
 
-    sorted_spans = sorted(valid, key=lambda s: (s.get('origin_x', 0), s['origin_y']))
+    sorted_spans = sorted(valid, key=lambda s: (_span_center(s), s['origin_y']))
     columns = [[sorted_spans[0]]]
     for s in sorted_spans[1:]:
-        col_x = sum(item.get('origin_x', 0) for item in columns[-1]) / len(columns[-1])
-        if abs(s.get('origin_x', 0) - col_x) < x_gap:
+        col_x = sum(_span_center(item) for item in columns[-1]) / len(columns[-1])
+        if abs(_span_center(s) - col_x) < x_gap:
             columns[-1].append(s)
         else:
             columns.append([s])
 
     for col in columns:
         col.sort(key=lambda s: s['origin_y'])
-    columns.sort(key=lambda col: min(s.get('origin_x', 0) for s in col))
+    columns.sort(key=lambda col: min(_span_center(s) for s in col))
     return columns
 
 
-def _parse_author_column(col_spans):
+def _order_in_rows(spans):
+    """Reading order (top-to-bottom, left-to-right) tolerant of raised superscripts."""
+    rows = []
+    for s in sorted(spans, key=lambda s: s['origin_y']):
+        if rows:
+            first = rows[-1][0]
+            if s['origin_y'] - first['origin_y'] <= 0.5 * max(first['size'], s['size']):
+                rows[-1].append(s)
+                continue
+        rows.append([s])
+    return [s for row in rows for s in sorted(row, key=lambda s: s.get('origin_x', 0))]
+
+
+# A whole comma segment of an affiliation that is a job title / study year, not a department
+AFFIL_ROLE_SEGMENT_RE = re.compile(
+    r'(?:(?:student|ug|pg|research|undergraduate|postgraduate)\s*)?(?:student|developer|scholar)s?'
+    r'|(?:asst\.?|assistant|associate|assoc\.?)?\s*prof(?:\.|essor)?'
+    r'|(?:m\.?sc|b\.?sc|b\.?tech|m\.?tech|mca|bca|msc\.?\s*cs)[.\s\w]*\b\d+\s*(?:st|nd|rd|th)\s*(?:sem(?:ester)?|year)'
+    r'|\d+\s*(?:st|nd|rd|th)\s*(?:sem(?:ester)?|year)',
+    re.I)
+AFFIL_LOWER_WORDS = {'of', 'and', 'for', 'the', 'in', 'at', 'on', 'to', '&'}
+
+
+def _clean_college(text):
+    """Tidy a joined affiliation string: stray brackets, job titles, email tails, casing."""
+    text = re.sub(r'\[\s*(.*?)\s*\]', r'\1', text.strip())
+    text = re.sub(r'^\((.*)\)$', r'\1', text.strip())                   # "(Department of X)"
+    text = re.sub(r'\b(Dept|Inst)\.(?=[A-Za-z])', r'\1. ', text)        # "Dept.of"
+    segments = []
+    for seg in re.split(r'\s*,\s*', text):
+        seg = seg.strip()
+        if seg.startswith('(') and seg.endswith(')'):
+            seg = seg[1:-1].strip()
+        if re.fullmatch(r'(?:[A-Z]\.){2,}[A-Z]?\.?', seg):
+            seg = seg.replace('.', '')                                   # "A.I.M.S.R" → "AIMSR"
+        if not seg or AFFIL_ROLE_SEGMENT_RE.fullmatch(seg) or re.fullmatch(r'\.?[a-z]{2,5}(?:\.[a-z]{2,3})*\.?', seg):
+            continue
+        # Title-case words typed all lowercase ("Department of biosciences")
+        seg = ' '.join(w if not w.islower() or w in AFFIL_LOWER_WORDS else w[0].upper() + w[1:]
+                       for w in seg.split())
+        segments.append(seg)
+    return ', '.join(segments).strip(' ,;:-')
+
+
+def _parse_author_column(col_spans, italic_is_affiliation=False):
     """
     Parse an author column/block into a list of authors (supporting multiple stacked
     authors in the same vertical column/grid cell as well as comma-separated authors).
+
+    - Lines after a name are that author's affiliation.
+    - Lines after a comma-separated name line ("A, B and C") are shared by the group.
+    - Numbered affiliation lines ("1Dept. ...", "1,2 Dept. ...") are mapped to the
+      authors' superscript numbers.
+    When italic_is_affiliation is True (IEEE style: upright names, italic affiliations),
+    italic spans are never treated as author names.
     """
     authors = []
-    curr_name = None
-    curr_college = []
-    curr_affil_num = None
+    group = []          # authors receiving the affiliation lines being collected
+    group_lines = []
+    numbered = {}       # affiliation number -> lines
+    numbered_target = None
+
+    def close_group():
+        college = smart_join_parts(group_lines)
+        for a in group:
+            if not a['college']:
+                a['college'] = college
+
+    def add_author(name, span, affil=None):
+        a = {'name': name, 'college': '', 'affil_num': affil,
+             '_y': span['origin_y'], '_x': span.get('origin_x', 0)}
+        authors.append(a)
+        return a
+
+    def start_numbered(nums):
+        # Lines collected for a number already seen (repeated block) are discarded
+        target = []
+        if any(n not in numbered for n in nums):
+            for n in nums:
+                numbered.setdefault(n, target)
+        return target
+
+    def digits_of(t):
+        nums = re.findall(r'\d+', t)
+        return nums if nums and not re.search(r'[A-Za-z]', t) else None
 
     i = 0
     while i < len(col_spans):
         s = col_spans[i]
         text = s['text'].strip()
-        if not text or is_copyright(text) or is_email(text) or is_location_line(text):
+        if (not text or not re.search(r'[A-Za-z0-9]', text) or is_copyright(text)
+                or is_email(text) or is_location_line(text)):
             i += 1
             continue
 
-        if s['is_super'] or re.match(r'^[\d\[\]]+$', text):
-            if curr_name and curr_affil_num is None:
-                curr_affil_num = re.sub(r'[\[\]\s]', '', text)
+        nxt = col_spans[i + 1] if i + 1 < len(col_spans) else None
+
+        # Affiliation number marker ("1", "1,2", "[1]", superscript "1*")
+        nums = digits_of(text)
+        if s['is_super'] or nums:
+            if nums and nxt is not None and not nxt['is_super'] and not is_person_name(nxt['text']) \
+                    and abs(nxt['origin_y'] - s['origin_y']) < max(8, nxt['size']):
+                # Marker in front of an affiliation line → numbered affiliation block
+                numbered_target = start_numbered(nums)
+            elif nums and nxt is not None and abs(nxt['origin_y'] - s['origin_y']) < 4 \
+                    and is_person_name(nxt['text']):
+                pass  # author index in front of a name ("1 Gajjela Prakash", "[2]Aditi Gupta")
+            elif nums and authors and authors[-1]['affil_num'] is None and group and authors[-1] in group:
+                authors[-1]['affil_num'] = nums[0]
             i += 1
             continue
 
-        # Check for multiple comma-separated names on a single line
-        if ',' in text and not is_affiliation_text(text):
-            parts = [p.strip() for p in text.split(',') if p.strip()]
-            if len(parts) >= 2 and all(is_person_name(p) or re.match(r'^[A-Za-z\s\.\d]+$', p) for p in parts):
-                if curr_name:
-                    authors.append({
-                        'name': curr_name,
-                        'college': smart_join_parts(curr_college),
-                        'affil_num': curr_affil_num
-                    })
-                    curr_name = None
-                    curr_college = []
-                    curr_affil_num = None
-                for p_name in parts:
-                    clean_name = clean_author_name(p_name)
-                    m_sup = re.search(r'\b(\d+)\b$', clean_name)
-                    p_aff = None
-                    if m_sup:
-                        p_aff = m_sup.group(1)
-                        clean_name = clean_name[:m_sup.start()].strip()
-                    if clean_name:
-                        authors.append({
-                            'name': clean_name,
-                            'college': '',
-                            'affil_num': p_aff
-                        })
+        # "1,2Dept. of ..." / "1Student, Department of ..."
+        m_num = re.match(r'^(\d+(?:\s*,\s*\d+)*)\s*(?=[A-Za-z])(.*)$', text)
+        if m_num and not is_person_name(m_num.group(2)):
+            numbered_target = start_numbered(re.findall(r'\d+', m_num.group(1)))
+            numbered_target.append(m_num.group(2))
+            i += 1
+            continue
+
+        # Italic lines are affiliations in IEEE-style author blocks
+        if italic_is_affiliation and s['is_italic']:
+            (numbered_target if numbered_target is not None else group_lines).append(text)
+            i += 1
+            continue
+
+        # Lone initial split into its own span (e.g. "A." + "Merry Ida") → join with the name
+        if re.match(r'^[A-Z]\.$', text) and nxt is not None:
+            if (abs(nxt['origin_y'] - s['origin_y']) < 2 and not nxt['is_italic']
+                    and is_person_name(nxt['text'])):
+                nxt = dict(nxt, text=text + ' ' + nxt['text'].strip(), origin_x=s.get('origin_x', 0))
+                col_spans = col_spans[:i + 1] + [nxt] + col_spans[i + 2:]
                 i += 1
                 continue
 
-        # Check for single person name
-        if is_person_name(text):
-            if curr_name:
-                authors.append({
-                    'name': curr_name,
-                    'college': smart_join_parts(curr_college),
-                    'affil_num': curr_affil_num
-                })
-                curr_name = None
-                curr_college = []
-                curr_affil_num = None
+        # Multiple names on one line: "A, B and C"
+        if re.search(r',|\sand\s|&', text) and not is_affiliation_text(text):
+            parts = [p.strip() for p in re.split(r'\s*,\s*|\s+and\s+|\s*&\s*', text) if p.strip()]
+            parts = [p for p in parts if re.search(r'[A-Za-z]{2}', p)]
+            if len(parts) >= 2 and all(is_person_name(p) for p in parts):
+                close_group()
+                group, group_lines, numbered_target = [], [], None
+                for p_name in parts:
+                    m_sup = re.search(r'(\d+)\W*$', p_name)
+                    clean_name = clean_author_name(p_name)
+                    if clean_name:
+                        group.append(add_author(clean_name, s, m_sup.group(1) if m_sup else None))
+                i += 1
+                continue
 
-            curr_name = clean_author_name(text)
-            if i + 1 < len(col_spans):
-                ns = col_spans[i + 1]
-                nt = ns['text'].strip()
-                if nt and (
-                    ns['is_super']
-                    or (abs(ns['origin_y'] - s['origin_y']) < 4 and re.match(r'^[\d\[\]]+$', nt))
-                ):
-                    curr_affil_num = re.sub(r'[\[\]\s]', '', nt)
+        # Template placeholder in place of a name ("Teacher"): drop it with its affiliation lines
+        if re.fullmatch(r'teacher', clean_author_name(text), re.I):
+            close_group()
+            group, group_lines, numbered_target = [], [], None
+            i += 1
+            continue
+
+        # Single person name
+        if is_person_name(text):
+            numbered_target = None
+            author = add_author(clean_author_name(text), s)
+            if group and not group_lines and abs(group[-1]['_y'] - s['origin_y']) < 4:
+                # Same line as the previous name ("A¹, B² and C*"): one shared affiliation
+                group.append(author)
+            else:
+                close_group()
+                group, group_lines = [author], []
+            if nxt is not None:
+                nt = nxt['text'].strip()
+                n_nums = digits_of(nt)
+                if n_nums and (nxt['is_super'] or abs(nxt['origin_y'] - s['origin_y']) < 4):
+                    author['affil_num'] = n_nums[0]
                     i += 2
                     continue
             i += 1
             continue
 
-        if curr_name is not None:
-            curr_college.append(text)
-
+        (numbered_target if numbered_target is not None else group_lines).append(text)
         i += 1
 
-    if curr_name:
-        authors.append({
-            'name': curr_name,
-            'college': smart_join_parts(curr_college),
-            'affil_num': curr_affil_num
-        })
+    close_group()
 
+    # Fill colleges of numbered authors from the numbered affiliation blocks
+    for a in authors:
+        lines = numbered.get(a['affil_num'] or '')
+        if lines:
+            a['college'] = smart_join_parts(lines)
+        a['college'] = _clean_college(a['college'])
     return authors
+
+
+def _merge_word_spans(spans, max_gap=6.0):
+    """
+    Join consecutive spans on the same baseline into one line-level span.
+    Some PDFs emit one span per word ("Marwadi" "University"), which would otherwise
+    be comma-joined as separate entities and filtered word-by-word.
+    """
+    merged = []
+    for s in spans:
+        if not s['text'].strip():
+            continue
+        prev = merged[-1] if merged else None
+        if (prev and not s['is_super'] and not prev['is_super']
+                and s['is_italic'] == prev['is_italic']
+                and abs(s['origin_y'] - prev['origin_y']) < 2
+                and -1.0 <= s.get('origin_x', 0) - prev.get('end_x', 0) <= max_gap):
+            # Glyph-adjacent fragments (small caps "T" + "HE") join without a space
+            gap = s.get('origin_x', 0) - prev.get('end_x', 0)
+            spaced = gap >= 0.8 or prev['text'][-1:].isspace() or s['text'][:1].isspace()
+            merged[-1] = dict(prev, text=prev['text'].rstrip() + (' ' if spaced else '') + s['text'].strip(),
+                              end_x=s.get('end_x', 0))
+        else:
+            merged.append(dict(s))
+    return merged
 
 
 def _extract_authors_spatial(section_spans):
@@ -480,32 +893,67 @@ def _extract_authors_spatial(section_spans):
     and grid-based author blocks (e.g. 2x2 or 3x2) are parsed completely.
     """
     filtered = []
-    for s in section_spans:
+    for s in _merge_word_spans(section_spans):
         text = s['text'].strip()
-        if not text or is_copyright(text) or is_email(text) or is_location_line(text):
+        if text and is_location_line(text):
+            # "AITR, Indore, India": keep the institution acronym, drop the place names
+            acronyms = [p.strip() for p in text.split(',') if re.fullmatch(r'[A-Z]{3,}', p.strip())]
+            acronyms += re.findall(r'\(([A-Z]{3,})\)', text)   # "(AIMSR) Indore,India"
+            if not acronyms:
+                continue
+            s = dict(s, text=', '.join(acronyms))
+            text = s['text']
+        if not text or is_copyright(text) or is_email(text):
+            continue
+        if AUTHOR_NOISE_RE.match(text):
             continue
         filtered.append(s)
 
     if not filtered:
         return []
 
-    x_values = [s.get('origin_x', 0) for s in filtered]
-    x_spread = max(x_values) - min(x_values) if x_values else 0
+    x0 = min(s.get('origin_x', 0) for s in filtered)
+    x1 = max(s.get('end_x', 0) for s in filtered)
+    x_spread = x1 - x0
+    # Grid layouts never have lines spanning most of the block width
+    wide_lines = sum(1 for s in filtered
+                     if s.get('end_x', 0) - s.get('origin_x', 0) > 0.6 * max(x_spread, 1))
+    columnar = x_spread > 120 and wide_lines == 0
+
+    # IEEE-style block: upright author names alongside italic affiliations
+    italic_is_affiliation = (
+        any(s['is_italic'] for s in filtered if not s['is_super'])
+        and any(not s['is_italic'] and is_person_name(s['text']) for s in filtered if not s['is_super'])
+    )
 
     authors = []
 
-    if x_spread > 120:
+    if columnar:
+        per_column = []
         for col in _cluster_spans_by_column(filtered):
-            parsed_list = _parse_author_column(col)
-            for a in parsed_list:
-                if a and a.get('name'):
-                    authors.append(a)
+            parsed_list = [a for a in _parse_author_column(col, italic_is_affiliation) if a and a.get('name')]
+            per_column.append(len(parsed_list))
+            authors.extend(parsed_list)
+        if all(n == 1 for n in per_column):
+            # Single row of authors: left to right, even when the cells are vertically staggered
+            authors.sort(key=lambda a: a['_x'])
+        else:
+            # Papers number authors row by row across the grid, not column by column
+            rows = []
+            for a in sorted(authors, key=lambda a: a['_y']):
+                if rows and a['_y'] - rows[-1][0]['_y'] <= 12:
+                    rows[-1].append(a)
+                else:
+                    rows.append([a])
+            authors = [a for row in rows for a in sorted(row, key=lambda a: a['_x'])]
     else:
-        ordered = sorted(filtered, key=lambda s: (s['origin_y'], s.get('origin_x', 0)))
-        parsed_list = _parse_author_column(ordered)
+        parsed_list = _parse_author_column(_order_in_rows(filtered), italic_is_affiliation)
         for a in parsed_list:
             if a and a.get('name'):
                 authors.append(a)
+    for a in authors:
+        a.pop('_y', None)
+        a.pop('_x', None)
 
     # Deduplicate identical name+college pairs from overlapping columns
     seen = set()
@@ -523,25 +971,67 @@ def _extract_authors_spatial(section_spans):
 # PDF SCRAPING HELPERS & EXTRACTION
 # ============================================================
 
-def _extract_text_spans(page):
+ZERO_WIDTH_RE = re.compile('[\u200b\u200c\u200d\u2060\ufeff]')
+
+
+def _split_on_wide_gaps(chars):
+    """
+    Split one PDF span into segments separated by runs of 3+ spaces.
+    Some author blocks are typed as one line padded with spaces
+    ("Priyanshu Sharma          Lovekush Nagda          Shubh Sharma").
+    Returns [(text, x0, x1)] using the real character positions.
+    """
+    segments = []
+    current = []
+    space_run = 0
+    for c in chars:
+        ch = ZERO_WIDTH_RE.sub('', c['c'])
+        if not ch:
+            continue
+        if ch.isspace():
+            space_run += 1
+            if space_run >= 3 and any(not x['c'].isspace() for x in current):
+                segments.append(current)
+                current = []
+            elif current:
+                current.append({'c': ch, 'origin': c['origin'], 'bbox': c['bbox']})
+            continue
+        space_run = 0
+        current.append({'c': ch, 'origin': c['origin'], 'bbox': c['bbox']})
+    if current:
+        segments.append(current)
+
+    out = []
+    for seg in segments:
+        solid = [c for c in seg if not c['c'].isspace()]
+        if not solid:
+            continue
+        out.append((''.join(c['c'] for c in seg), solid[0]['origin'][0], solid[-1]['bbox'][2]))
+    return out
+
+
+def _extract_text_spans(page, page_no=0, y_offset=0.0):
     """Flatten and enhance all text spans in reading order from a PDF page."""
-    page_dict = page.get_text('dict')
+    page_dict = page.get_text('rawdict')
     spans = []
     for block in page_dict.get('blocks', []):
         if 'lines' not in block:
             continue
         for line in block['lines']:
             for span in line['spans']:
-                spans.append({
-                    'text': span['text'],
-                    'size': round(span['size'], 1),
-                    'flags': span['flags'],
-                    'is_bold': bool(span['flags'] & 16),
-                    'is_italic': bool(span['flags'] & 2),
-                    'is_super': bool(span['flags'] & 1),
-                    'origin_x': round(span['origin'][0], 1) if 'origin' in span else 0,
-                    'origin_y': round(span['origin'][1], 1) if 'origin' in span else 0,
-                })
+                for text, x0, x1 in _split_on_wide_gaps(span.get('chars', [])):
+                    spans.append({
+                        'text': text,
+                        'size': round(span['size'], 1),
+                        'flags': span['flags'],
+                        'is_bold': bool(span['flags'] & 16),
+                        'is_italic': bool(span['flags'] & 2),
+                        'is_super': bool(span['flags'] & 1),
+                        'origin_x': round(x0, 1),
+                        'origin_y': round(span['origin'][1] + y_offset, 1),
+                        'end_x': round(x1, 1),
+                        'page': page_no,
+                    })
 
     # Enhanced superscript detection for baseline-shifted / scaled fonts
     for i in range(1, len(spans)):
@@ -549,31 +1039,103 @@ def _extract_text_spans(page):
         if s['is_super']:
             continue
         prev = spans[i - 1]
-        text = s['text'].strip()
-        if not text:
-            continue
-        if abs(s['origin_y'] - prev['origin_y']) < 3:
+        if abs(s['origin_y'] - prev['origin_y']) < max(3, prev['size'] * 0.5):
             if prev['size'] > 0 and s['size'] < prev['size'] * 0.75:
                 s['is_super'] = True
 
     return spans
 
 
+TITLE_PREFIX_RE = re.compile(
+    r'^(?:research\s+paper|paper\s+title|title|topic)\s*[:\-–—]+\s*', re.I)
+
+# "Abstract—", "1Abstract–-", "ABSTRACT: -", "A B S T R A C T"
+ABSTRACT_MARKER_RE = re.compile(
+    r'^[\W\d_]{0,3}\s*(?:abstract|a\s+b\s+s\s+t\s+r\s+a\s+c\s+t)(?![a-z])', re.I)
+# "Keywords—", "Key Words:", "Index Terms—", "“Keywords —"
+KEYWORDS_MARKER_RE = re.compile(
+    r'^[\W\d_]{0,3}\s*(?:key\s*words?|index\s*terms?)(?![a-z])', re.I)
+# "I. INTRODUCTION", "1.Introduction", "Section I. INTRODUCTION", "Introduction"
+SECTION_HEADING_RE = re.compile(
+    r'^(?:section\s+)?(?:[IVX]{1,4}|\d{1,2})?\s*[.):]?\s*'
+    r'(?:introduction|background|related\s+works?|literature\s+(?:review|survey))\s*[:.]?\s*$',
+    re.I)
+
+
+def _is_section_heading(spans, i):
+    """True when span i starts the paper body (first numbered/introduction heading)."""
+    t = spans[i]['text'].strip()
+    if SECTION_HEADING_RE.match(t):
+        return True
+    # Small-caps heading split into fragments: "I" + "NTRODUCTION", "I." + "I" + "NTRODUCTION"
+    if len(re.sub(r'[^A-Za-z]', '', t)) <= 2:
+        joined = t
+        for j in range(i + 1, min(i + 4, len(spans))):
+            if abs(spans[j]['origin_y'] - spans[i]['origin_y']) >= 3:
+                break
+            joined += spans[j]['text'].strip()
+            if SECTION_HEADING_RE.match(joined):
+                return True
+    # Roman-numbered upper-case heading: "I. THE CHALLENGE AHEAD", or "I." followed by
+    # small-caps fragments on the same line ("I." "T" "HE " "A" "CCESS")
+    m = re.match(r'^[IVX]{1,4}\.\s*(.*)$', t)
+    if not m:
+        return False
+    rest = m.group(1)
+    j = i + 1
+    while len(re.sub(r'[^A-Za-z]', '', rest)) < 4 and j < min(i + 4, len(spans)):
+        if abs(spans[j]['origin_y'] - spans[i]['origin_y']) >= 3:
+            break
+        rest += spans[j]['text']
+        j += 1
+    letters = re.sub(r'[^A-Za-z]', '', rest)
+    return len(letters) >= 2 and sum(c.isupper() for c in letters) >= 0.8 * len(letters)
+
+
 def _extract_title(spans):
-    """Extracts title by finding spans with the maximum font size."""
-    sizes = [s['size'] for s in spans if s['text'].strip()]
-    if not sizes:
-        return "", 0
-    max_size = max(sizes)
-    title_parts = []
-    last_title_idx = 0
-    for i, s in enumerate(spans):
-        if s['size'] == max_size and s['text'].strip():
-            title_parts.append(s['text'].strip())
-            last_title_idx = i
-    title = ' '.join(title_parts)
+    """
+    Extract the title from page 1: the first block of the largest font (same weight,
+    vertically adjacent lines), extended by an adjacent smaller-font subtitle line
+    such as "KISAAN:" followed by "An AI-Powered ...".
+    Returns (title, last_title_idx, title_indices).
+    """
+    page1 = [i for i, s in enumerate(spans)
+             if s.get('page', 0) == 0 and s['text'].strip() and not s['is_super']
+             and not is_copyright(s['text'])]
+    if not page1:
+        return "", 0, set()
+    max_size = max(spans[i]['size'] for i in page1)
+    first = min((i for i in page1 if spans[i]['size'] == max_size),
+                key=lambda i: (spans[i]['origin_y'], spans[i]['origin_x']))
+    ref_bold = spans[first]['is_bold']
+    top_y = spans[first]['origin_y']
+
+    def collect(min_size):
+        cands = sorted(
+            (i for i in page1
+             if min_size <= spans[i]['size'] <= max_size
+             and spans[i]['is_bold'] == ref_bold
+             and spans[i]['origin_y'] >= top_y - 3),
+            key=lambda i: (spans[i]['origin_y'], spans[i]['origin_x']))
+        chosen, last_y = [], top_y
+        for i in cands:
+            if spans[i]['origin_y'] - last_y > spans[i]['size'] * 2.2:
+                break
+            chosen.append(i)
+            last_y = max(last_y, spans[i]['origin_y'])
+        return chosen
+
+    chosen = collect(max_size - 0.5)
+    extended = collect(max_size * 0.65)
+    # Only accept the subtitle extension when it stays a single title block
+    if len(extended) > len(chosen) and all(i in extended for i in chosen):
+        chosen = extended
+
+    chosen.sort(key=lambda i: (round(spans[i]['origin_y']), spans[i]['origin_x']))
+    title = ' '.join(spans[i]['text'].strip() for i in chosen)
     title = re.sub(r'\s+', ' ', title).strip()
-    return title, last_title_idx
+    title = TITLE_PREFIX_RE.sub('', title).strip()
+    return title, max(chosen), set(chosen)
 
 
 def _extract_fallback_keywords(title, abstract_text):
@@ -643,16 +1205,19 @@ def extract_paper_data(pdf_path):
         doc.close()
         return None
 
-    page = doc[0]
-    spans = _extract_text_spans(page)
+    # Page 1 plus page 2: some templates put the abstract/keywords on page 2
+    spans = _extract_text_spans(doc[0], 0, 0.0)
+    if len(doc) > 1:
+        spans += _extract_text_spans(doc[1], 1, doc[0].rect.height)
     doc.close()
+    spans = _merge_word_spans(spans)
 
     if not spans:
         print(f"  [ERROR] FATAL: No text spans found on page 1")
         return None
 
     # STEP 1: EXTRACT TITLE
-    title, last_title_idx = _extract_title(spans)
+    title, last_title_idx, title_indices = _extract_title(spans)
     if not title:
         print(f"  [WARN] No title found")
     else:
@@ -661,11 +1226,9 @@ def extract_paper_data(pdf_path):
     # STEP 2: LOCATE ABSTRACT & KEYWORDS
     abstract_idx = None
     for i in range(last_title_idx + 1, len(spans)):
-        text = spans[i]['text'].strip()
-        if re.match(r'^Abstract\b', text, re.IGNORECASE):
-            if spans[i]['is_bold'] or spans[i]['is_italic'] or spans[i]['size'] <= 10:
-                abstract_idx = i
-                break
+        if ABSTRACT_MARKER_RE.match(spans[i]['text'].strip()):
+            abstract_idx = i
+            break
 
     if abstract_idx is None:
         print(f"  [WARN] 'Abstract' marker not found -- trying fallback")
@@ -674,13 +1237,23 @@ def extract_paper_data(pdf_path):
                 abstract_idx = i
                 break
 
-    # Find "Keywords" / "Index Terms" marker
+    # Find "Keywords" / "Index Terms" marker (stop looking once the body starts)
     keywords_idx = None
     kw_start = (abstract_idx + 1) if abstract_idx is not None else (last_title_idx + 1)
+    for i in range(kw_start, len(spans) - 1):
+        # Justified lines can split the label itself: "Index " + "Terms—digital twin"
+        t, nxt = spans[i]['text'].strip(), spans[i + 1]
+        if (re.match(r'^[\W\d_]{0,3}\s*(?:index|key)$', t, re.I)
+                and re.match(r'^(?:terms?|words?)\b', nxt['text'].strip(), re.I)
+                and abs(nxt['origin_y'] - spans[i]['origin_y']) < 3):
+            spans[i] = dict(spans[i], text=t + ' ' + nxt['text'].strip(), end_x=nxt['end_x'])
+            del spans[i + 1]
+            break
     for i in range(kw_start, len(spans)):
-        text = spans[i]['text'].strip()
-        if re.match(r'^(?:Keywords?|Key\s*Words?|Index\s*Terms?)\b', text, re.IGNORECASE):
+        if KEYWORDS_MARKER_RE.match(spans[i]['text'].strip()):
             keywords_idx = i
+            break
+        if _is_section_heading(spans, i):
             break
 
     # ════════════════════════════════════════════════
@@ -688,7 +1261,8 @@ def extract_paper_data(pdf_path):
     # ════════════════════════════════════════════════
     authors = []
     if abstract_idx is not None:
-        section = spans[last_title_idx + 1: abstract_idx]
+        section = [s for i, s in enumerate(spans[last_title_idx + 1: abstract_idx], last_title_idx + 1)
+                   if i not in title_indices]
         authors = _extract_authors_spatial(section)
 
     if authors:
@@ -711,12 +1285,14 @@ def extract_paper_data(pdf_path):
 
         for i in range(abstract_idx, end_idx):
             text = spans[i]['text'].strip()
-            if not text:
+            if not text or is_copyright(text):
                 continue
+            if i > abstract_idx and _is_section_heading(spans, i):
+                break
 
             if not started:
-                text = re.sub(r'^Abstract\s*', '', text, flags=re.IGNORECASE).strip()
-                text = text.lstrip('-–—: \u2014\u2013').strip()
+                text = ABSTRACT_MARKER_RE.sub('', text, count=1).strip()
+                text = text.lstrip('-–—:.* \u2014\u2013').strip()
                 if not text:
                     continue
                 started = True
@@ -746,36 +1322,43 @@ def extract_paper_data(pdf_path):
     # ════════════════════════════════════════════════
     if keywords_idx is not None and not keywords_text:
         parts = []
-        started = False
+        kw_size = spans[keywords_idx]['size']
+        last_y = spans[keywords_idx]['origin_y']
 
         for i in range(keywords_idx, len(spans)):
             s = spans[i]
             t = s['text'].strip()
-            if not t:
+            if not t or is_copyright(t):
                 continue
 
-            # Stop at true section headers (I. INTRODUCTION, Roman numerals, etc.)
-            if re.match(r'^[IVX]+\.', t) or t in ('I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII') or re.match(r'^[IVX]+\.?\s', t) or 'NTRODUCTION' in t:
-                break
-            if re.match(r'^(?:1\.|I\.)\s*INTRODUCTION', t, re.IGNORECASE):
-                break
-            if s['size'] > 13.0:
-                break
-
-            if not started:
-                t = re.sub(r'^(?:Keywords?|Key\s*Words?|Index\s*Terms?)\s*', '', t, flags=re.IGNORECASE).strip()
-                t = t.lstrip('-–—: \u2014\u2013').strip()
-                started = True
-                if t:
-                    parts.append(t)
-            else:
+            if i > keywords_idx:
+                # Keywords are a single paragraph: stop at a heading, a paragraph
+                # gap, a jump to another column/page, or a change of font size
+                if _is_section_heading(spans, i):
+                    break
+                if not parts:
+                    # Label on its own line ("Keywords:" / "Keywords" + "—"): take the next line
+                    kw_size = s['size']
+                    last_y = s['origin_y']
+                if s['origin_y'] - last_y > max(2.0 * s['size'], s['size'] + 8):
+                    break
+                if s['origin_y'] < last_y - 3:
+                    break
+                if abs(s['size'] - kw_size) > 1.5 and not s['is_super']:
+                    break
                 if re.match(r'^[A-Z\s]{5,}$', t) and not any(c in t for c in [',', ';']):
                     break
+            last_y = max(last_y, s['origin_y'])
+
+            if i == keywords_idx:
+                t = KEYWORDS_MARKER_RE.sub('', t, count=1).strip()
+                t = t.lstrip('-–—:.* \u2014\u2013').strip()
+            if t:
                 parts.append(t)
 
         if parts:
             keywords_text = ' '.join(parts)
-            keywords_text = re.sub(r'\s+', ' ', keywords_text).strip().rstrip('.')
+            keywords_text = re.sub(r'\s+', ' ', keywords_text).strip().rstrip('.”"')
 
     # Fallback keyword extraction if none found in original PDF
     is_fallback_kw = False
@@ -784,6 +1367,11 @@ def extract_paper_data(pdf_path):
         if keywords_text:
             is_fallback_kw = True
             print(f"  [FALLBACK] Inferred Keywords: \"{keywords_text[:80]}\"")
+
+    if keywords_text:
+        keywords_text = tidy_keywords(keywords_text)
+    if abstract_text:
+        abstract_text = tidy_abstract(abstract_text, keywords_text)
 
     if keywords_text:
         print(f"  [OK] Keywords: \"{keywords_text[:80]}{'...' if len(keywords_text) > 80 else ''}\"")
@@ -825,6 +1413,25 @@ def extract_paper_data(pdf_path):
         anomalies.append("Missing abstract")
     if not keywords_text:
         anomalies.append("Missing keywords")
+
+    # 6. Sanity limits: catch run-on or truncated fields the extractor cannot see itself
+    if len(keywords_text) > 450:
+        anomalies.append(f"Keywords unusually long ({len(keywords_text)} chars) -- may include body text")
+    if len(abstract_text) > 3000:
+        anomalies.append(f"Abstract unusually long ({len(abstract_text)} chars) -- may include body text")
+    if title and (len(title) < 15 or title.rstrip().endswith((':', '-', ','))):
+        anomalies.append(f"Title looks incomplete: \"{title}\"")
+    if title and re.search(r'\b(?:a|an|the|of|in|for|and|to|with|on)$', title.rstrip(), re.I):
+        anomalies.append(f"Title may be cut off in the source PDF: \"...{title[-45:]}\"")
+    for old, new in AUTHOR_OVERRIDES.get(filename, {}).get('rename', {}).items():
+        for a in authors:
+            if a['name'] == old:
+                a['name'] = new
+                anomalies.append(f"Author name corrected by author_overrides.json: \"{old}\" -> \"{new}\"")
+    suspicious = [a['name'] for a in authors
+                  if re.search(r'[@:\d]|\b(?:author|e-?mail|student|note|teacher)\b', a['name'], re.I)]
+    if suspicious:
+        anomalies.append("Suspicious author name(s) -- check the source PDF: " + ', '.join(suspicious))
 
     if anomalies:
         print(f"  [ANOMALY / DOUBT] {len(anomalies)} issue(s) detected: {'; '.join(anomalies)}")
@@ -871,12 +1478,15 @@ class DotSeparator(Flowable):
         self.height = height
 
     def draw(self):
-        dots = "●  " * 10 + "●"
-        self.canv.setFont("Helvetica", 7)
-        tw = self.canv.stringWidth(dots, "Helvetica", 7)
-        x = (self.width - tw) / 2
-        y = max(1, self.height / 3)
-        self.canv.drawString(x, y, dots)
+        # Vector circles rather than a "●" glyph: no unembedded symbol font, and copying
+        # the page text no longer yields "G G G"
+        count, radius, pitch = 11, 2.5 * LAYOUT_SCALE, 9.45 * LAYOUT_SCALE
+        span = (count - 1) * pitch
+        x = (self.width - span) / 2
+        y = max(1, self.height / 3) + 2.6 * LAYOUT_SCALE
+        self.canv.setFillColor(black)
+        for i in range(count):
+            self.canv.circle(x + i * pitch, y, radius, stroke=0, fill=1)
 
 
 # ============================================================
@@ -889,12 +1499,13 @@ _SUPERSCRIPT_DIGITS = {
     6: '\u2076', 7: '\u2077', 8: '\u2078', 9: '\u2079', 10: '\u00b9\u2070',
 }
 
-def format_authors_with_affiliations(authors, use_html_super=True):
+def format_authors_with_affiliations(authors, use_html_super=True, max_width=None, font_size=None):
     """
     Format authors with superscript affiliation numbers.
 
-    Line 1: names only with superscripts (when multiple affiliations exist).
+    Line 1: names with superscript affiliation numbers (always, even for one affiliation).
     Line 2: numbered affiliations (department/college), never job titles as authors.
+            When they do not fit on one line (max_width), each affiliation gets its own line.
 
     Returns:
         (authors_line, affiliations_line)
@@ -934,39 +1545,26 @@ def format_authors_with_affiliations(authors, use_html_super=True):
         author_nums.append(college_to_num[college])
 
     college_list = [c for c in college_list if c]
-    all_same = len(college_list) <= 1
+    if len(college_list) == 1:
+        # One shared affiliation: an author whose college was not found still belongs to it
+        author_nums = [1] * len(authors)
+
+    def sup(num):
+        return f"<super>{num}</super>" if use_html_super else _SUPERSCRIPT_DIGITS.get(num, str(num))
 
     author_parts = []
     for i, a in enumerate(authors):
-        name_safe = html_escape(a['name'])
-        if all_same:
-            author_parts.append(name_safe)
-        else:
-            num = author_nums[i]
-            if num is None:
-                author_parts.append(name_safe)
-            elif use_html_super:
-                author_parts.append(f"{name_safe}<super>{num}</super>")
-            else:
-                sup = _SUPERSCRIPT_DIGITS.get(num, str(num))
-                author_parts.append(f"{name_safe}{sup}")
+        name_safe = markup_text(a['name'])
+        num = author_nums[i] if college_list else None
+        author_parts.append(name_safe if num is None else f"{name_safe}{sup(num)}")
     authors_line = ', '.join(author_parts)
 
-    if all_same and college_list:
-        affiliations_line = html_escape(college_list[0])
-    elif college_list:
-        aff_parts = []
-        for idx, college in enumerate(college_list):
-            num = idx + 1
-            college_safe = html_escape(college) if college else 'N/A'
-            if use_html_super:
-                aff_parts.append(f"<super>{num}</super>{college_safe}")
-            else:
-                sup = _SUPERSCRIPT_DIGITS.get(num, str(num))
-                aff_parts.append(f"{sup}{college_safe}")
-        affiliations_line = ', '.join(aff_parts)
-    else:
-        affiliations_line = ''
+    aff_parts = [f"{sup(idx + 1)}{markup_text(college)}" for idx, college in enumerate(college_list)]
+    affiliations_line = ', '.join(aff_parts)
+    if len(aff_parts) > 1 and max_width and font_size:
+        plain = ', '.join(f"{idx + 1}{college}" for idx, college in enumerate(college_list))
+        if stringWidth(plain, FONT_ITALIC, font_size) > max_width:
+            affiliations_line = '<br/>'.join(aff_parts)
 
     return authors_line, affiliations_line
 
@@ -974,6 +1572,17 @@ def format_authors_with_affiliations(authors, use_html_super=True):
 # ============================================================
 # PDF GENERATION — BODY PAGES
 # ============================================================
+
+def _draw_footer_url(canvas, y):
+    """Footer website text (left-aligned); clickable when it is a web address."""
+    canvas.setFont(FONT_BOLD, FOOTER_URL_FONT_SIZE)
+    canvas.setFillColor(black)
+    canvas.drawString(LEFT_MARGIN, y, FOOTER_URL)
+    if re.match(r'(?:https?://|www\.)', FOOTER_URL, re.I):
+        url = FOOTER_URL if re.match(r'https?://', FOOTER_URL, re.I) else 'https://' + FOOTER_URL
+        width = canvas.stringWidth(FOOTER_URL, FONT_BOLD, FOOTER_URL_FONT_SIZE)
+        canvas.linkURL(url, (LEFT_MARGIN, y - 2, LEFT_MARGIN + width, y + FOOTER_URL_FONT_SIZE), relative=0)
+
 
 def _body_page_handler(canvas, doc):
     """Draw header and footer on each body page."""
@@ -983,33 +1592,31 @@ def _body_page_handler(canvas, doc):
     # HEADER
     # ══════════════════════════════════════
     # Conference name (italic, left-aligned)
-    canvas.setFont("Times-Italic", HEADER_FONT_SIZE)
-    header_y = PAGE_HEIGHT - 38
+    canvas.setFont(FONT_ITALIC, HEADER_FONT_SIZE)
+    header_y = PAGE_HEIGHT - 38 * LAYOUT_SCALE
     canvas.drawString(LEFT_MARGIN, header_y, CONFERENCE_HEADER)
 
     # Deep blue header divider line
     canvas.setStrokeColor(DIVIDER_COLOR)
     canvas.setLineWidth(1.2)
-    header_line_y = header_y - 9
+    header_line_y = header_y - 9 * LAYOUT_SCALE
     canvas.line(LEFT_MARGIN, header_line_y, PAGE_WIDTH - RIGHT_MARGIN, header_line_y)
 
     # ══════════════════════════════════════
     # FOOTER
     # ══════════════════════════════════════
     # Deep blue footer divider line
-    footer_line_y = BOTTOM_MARGIN - 5
+    footer_line_y = BOTTOM_MARGIN - 5 * LAYOUT_SCALE
     canvas.setStrokeColor(DIVIDER_COLOR)
     canvas.setLineWidth(1.2)
     canvas.line(LEFT_MARGIN, footer_line_y, PAGE_WIDTH - RIGHT_MARGIN, footer_line_y)
 
     # Website (left-aligned) below the line
-    footer_text_y = footer_line_y - 14
-    canvas.setFont("Times-Bold", FOOTER_URL_FONT_SIZE)
-    canvas.setFillColor(black)
-    canvas.drawString(LEFT_MARGIN, footer_text_y, FOOTER_URL)
+    footer_text_y = footer_line_y - 14 * LAYOUT_SCALE
+    _draw_footer_url(canvas, footer_text_y)
 
     # Page number (right-aligned) below the line
-    canvas.setFont("Times-Roman", FOOTER_PAGE_FONT_SIZE)
+    canvas.setFont(FONT_REGULAR, FOOTER_PAGE_FONT_SIZE)
     canvas.drawRightString(PAGE_WIDTH - RIGHT_MARGIN, footer_text_y, str(doc.page))
 
     canvas.restoreState()
@@ -1054,6 +1661,11 @@ TIER_SPECS = [
     }
 ]
 
+for _tier in TIER_SPECS:
+    for _key in ('space_title', 'space_auth', 'space_abs', 'space_kw', 'spacer_auth_abs',
+                 'sep_top', 'sep_dot', 'sep_bottom', 'sep_total'):
+        _tier[_key] *= LAYOUT_SCALE
+
 
 def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     """
@@ -1077,7 +1689,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     uid = random.randint(1, 999999)
     st_title = ParagraphStyle(
         f"title_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
-        fontName='Times-Bold',
+        fontName=FONT_BOLD,
         fontSize=font_title,
         leading=font_title * leading_factor,
         alignment=TA_CENTER,
@@ -1087,7 +1699,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     )
     st_auth = ParagraphStyle(
         f"auth_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
-        fontName='Times-Roman',
+        fontName=FONT_REGULAR,
         fontSize=font_auth,
         leading=font_auth * leading_factor,
         alignment=TA_CENTER,
@@ -1097,7 +1709,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     )
     st_abs = ParagraphStyle(
         f"abs_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
-        fontName='Times-Roman',
+        fontName=FONT_REGULAR,
         fontSize=font_abs,
         leading=font_abs * leading_factor,
         alignment=TA_JUSTIFY,
@@ -1107,7 +1719,7 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     )
     st_kw = ParagraphStyle(
         f"kw_{tier.get('name', 'tier')}_{len(page_papers)}_{uid}",
-        fontName='Times-Roman',
+        fontName=FONT_REGULAR,
         fontSize=font_kw,
         leading=font_kw * leading_factor,
         alignment=TA_LEFT,
@@ -1120,10 +1732,11 @@ def _build_and_measure_page(page_papers, page_paper_indices, tier, avail_width):
     k = len(page_papers)
 
     for item_idx, (paper, paper_idx) in enumerate(zip(page_papers, page_paper_indices)):
-        title_safe = html_escape(paper['title'])
-        abstract_safe = html_escape(paper['abstract'])
-        keywords_safe = html_escape(paper['keywords'])
-        authors_text, affiliations_text = format_authors_with_affiliations(paper['authors'], use_html_super=True)
+        title_safe = markup_text(paper['title'])
+        abstract_safe = markup_text(paper['abstract'])
+        keywords_safe = markup_text(paper['keywords'])
+        authors_text, affiliations_text = format_authors_with_affiliations(
+            paper['authors'], use_html_super=True, max_width=avail_width, font_size=font_auth)
 
         p_title = Paragraph(title_safe, st_title)
         p_authors = Paragraph(authors_text, st_auth)
@@ -1205,8 +1818,8 @@ def _find_optimal_zero_waste_packing(papers, avail_height, forbidden_pairs=None)
     n = len(papers)
     if n == 0:
         return []
-    if n == 1:
-        return [(0,)]
+    if n == 1 or MAX_PAPERS_PER_PAGE == 1:
+        return [(i,) for i in range(n)]   # one per page, in reading order
 
     if forbidden_pairs is None:
         forbidden_pairs = set()
@@ -1454,7 +2067,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
     at the bottom of the page with strict safe headroom.
     """
     k = len(page_papers)
-    target_budget = avail_height - 45.0
+    target_budget = avail_height - 45.0 * LAYOUT_SCALE
     best_tier = None
     base_h = 0
 
@@ -1471,13 +2084,14 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
         _, base_h = _build_and_measure_page(page_papers, page_paper_indices, best_tier, avail_width)
 
     # Calculate remaining white space (slack) with conservative 40pt buffer
-    slack = (avail_height - 40.0) - base_h
+    slack = (avail_height - 40.0 * LAYOUT_SCALE) - base_h
 
-    # Vertically justify if there is slack and it's not a short final page
-    if slack > 4.0 and (not is_final_page or (base_h / avail_height) >= 0.70):
+    # Vertically justify if there is slack. The boost is capped (4pt on A4), so a short final
+    # page is not stretched to the bottom; it just gets the same spacing as the full pages.
+    if slack > 4.0:
         # Expansion points: 5 per paper + 2 per separator
         num_expand_points = 5 * k + (2 * (k - 1) if k > 1 else 0)
-        boost = min(4.0, slack / max(1, num_expand_points))
+        boost = min(4.0 * LAYOUT_SCALE, slack / max(1, num_expand_points))
 
         # Iteratively verify that justified layout does not exceed target budget
         while boost >= 0.5:
@@ -1492,7 +2106,7 @@ def _generate_page_flowables_justified(page_papers, page_paper_indices, avail_wi
             justified_tier['sep_bottom'] = best_tier['sep_bottom'] + (boost * 1.4)
 
             flowables, final_h = _build_and_measure_page(page_papers, page_paper_indices, justified_tier, avail_width)
-            if final_h <= avail_height - 35.0:
+            if final_h <= avail_height - 35.0 * LAYOUT_SCALE:
                 return flowables, justified_tier['name'], final_h
             boost -= 0.5
 
@@ -1565,6 +2179,7 @@ def generate_body_pdf(papers, output_path):
     Returns tuple (page_map, page_groups, page_density_modes)
     """
     global _page_map
+    random.seed(PACKING_SEED)   # same papers -> same page layout on every run
     avail_height = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN
     forbidden_pairs = set()
 
@@ -1573,7 +2188,7 @@ def generate_body_pdf(papers, output_path):
 
         doc = BaseDocTemplate(
             output_path,
-            pagesize=A4,
+            pagesize=PAGE_SIZE,
             leftMargin=LEFT_MARGIN,
             rightMargin=RIGHT_MARGIN,
             topMargin=TOP_MARGIN,
@@ -1586,6 +2201,8 @@ def generate_body_pdf(papers, output_path):
             CONTENT_WIDTH,
             avail_height,
             id='body_frame',
+            # Zero padding so the frame matches CONTENT_WIDTH used when measuring heights
+            leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0,
         )
 
         doc.addPageTemplates([
@@ -1642,6 +2259,11 @@ def generate_body_pdf(papers, output_path):
                 if 'page' in d and d['page'] <= len(page_groups):
                     offending_group = page_groups[d['page'] - 1]
                     forbidden_pairs.add(tuple(sorted(offending_group)))
+                elif d['type'] == 'page_count_mismatch':
+                    # Forbid any planned group whose papers were pushed onto different pages
+                    for group in page_groups:
+                        if len({_page_map.get(idx) for idx in group}) > 1:
+                            forbidden_pairs.add(tuple(sorted(group)))
 
             print(f"  [SELF-HEALING] Re-optimizing pairings with tighter constraints...")
 
@@ -1670,37 +2292,48 @@ def generate_toc_pdf(papers, page_map, output_path):
         ...
     ]
     """
-    c = canvas_mod.Canvas(output_path, pagesize=A4)
-    y = PAGE_HEIGHT - 75
+    c = canvas_mod.Canvas(output_path, pagesize=PAGE_SIZE)
+    top_y = PAGE_HEIGHT - 75 * LAYOUT_SCALE
+    y = top_y
     current_toc_page = 0
     toc_entries_meta = []
 
+    # Entry sizes follow the abstract text size (9 / 8 pt titles / names for 10 pt abstracts)
+    toc_title_size = ABSTRACT_FONT_SIZE * 0.9
+    toc_line_height = toc_title_size * 11.5 / 9
+    toc_author_size = ABSTRACT_FONT_SIZE * 0.75
+    toc_author_pitch = toc_author_size * 9.5 / 7.5
+    toc_dot_size = toc_title_size * 8 / 9
+
     # ── "Contents" heading ──
-    c.setFont("Times-Bold", 24)
+    c.setFont(FONT_BOLD, 24 * LAYOUT_SCALE)
     c.drawString(LEFT_MARGIN, y, "Contents")
-    y -= 28
+    y -= 28 * LAYOUT_SCALE
 
     # Deep blue underline
     c.setStrokeColor(DIVIDER_COLOR)
     c.setLineWidth(1.5)
     c.line(LEFT_MARGIN, y, PAGE_WIDTH - RIGHT_MARGIN, y)
-    y -= 25
+    y -= 25 * LAYOUT_SCALE
     # ── Sort papers by page number ascending ──
     sorted_papers = [(i, p, page_map.get(i, 9999)) for i, p in enumerate(papers)]
     sorted_papers.sort(key=lambda x: x[2])
 
     for i, paper, page_val in sorted_papers:
-        page_num = str(page_val) if page_val != 9999 else '?'
+        if page_val == 9999:
+            page_num = '?'
+        elif TOC_PAGE_NUMBERS == 'roman':
+            page_num = to_roman(page_val)
+        else:
+            page_num = str(page_val)
 
         # ── Pre-estimate this entry's total height ──
-        toc_title_font = "Times-Roman"
-        toc_title_size = 9.0
-        toc_line_height = 11.5
+        toc_title_font = FONT_REGULAR
 
         title = paper['title']
-        pnum_width = stringWidth(page_num, "Times-Roman", toc_title_size)
-        dot_char_width = stringWidth('.', "Times-Roman", 8)
-        max_single_w = CONTENT_WIDTH - pnum_width - 25
+        pnum_width = stringWidth(page_num, FONT_REGULAR, toc_title_size)
+        dot_char_width = stringWidth('.', FONT_REGULAR, toc_dot_size)
+        max_single_w = CONTENT_WIDTH - pnum_width - 25 * LAYOUT_SCALE
 
         title_full_w = stringWidth(title, toc_title_font, toc_title_size)
         if title_full_w <= max_single_w:
@@ -1733,24 +2366,24 @@ def generate_toc_pdf(papers, page_map, output_path):
                 lines = [line1] + sub_lines
 
         author_names = ', '.join(a['name'] for a in paper['authors'])
-        author_lines = _word_wrap(author_names, "Times-Italic", 7.5, CONTENT_WIDTH) if author_names else []
+        author_lines = _word_wrap(author_names, FONT_ITALIC, toc_author_size, CONTENT_WIDTH) if author_names else []
 
         # Total height this entry will consume
         entry_height = (len(lines) * toc_line_height +
-                        len(author_lines) * 9.5 + 6)
+                        len(author_lines) * toc_author_pitch + TOC_ENTRY_GAP)
 
         # ── Check for page overflow BEFORE drawing ──
-        if y - entry_height < 50:
+        if y - entry_height < 50 * LAYOUT_SCALE:
             _draw_toc_footer(c)
             c.showPage()
             current_toc_page += 1
             # Draw header on continuation TOC pages
             _draw_toc_header(c)
-            y = PAGE_HEIGHT - 75
+            y = top_y
 
         # Record top of entry for hyperlink bounding box
         entry_toc_page = current_toc_page
-        entry_top_rl = y + toc_title_size + 2.0
+        entry_top_rl = y + toc_title_size - 1.5 * LAYOUT_SCALE   # just above the title's capitals
 
         # ── Draw title with dotted leaders → page number ──
         for j, line in enumerate(lines):
@@ -1762,28 +2395,30 @@ def generate_toc_pdf(papers, page_map, output_path):
                     line, toc_title_font, toc_title_size
                 ) + 5
                 page_right_x = PAGE_WIDTH - RIGHT_MARGIN
-                dot_limit_x = page_right_x - pnum_width - 8
+                dot_limit_x = page_right_x - pnum_width - 8 * LAYOUT_SCALE
 
-                c.setFont("Times-Roman", 8)
+                c.setFont(FONT_REGULAR, toc_dot_size)
                 x = title_end_x
                 while x + dot_char_width < dot_limit_x:
                     c.drawString(x, y, '.')
-                    x += dot_char_width + 1.2
+                    x += dot_char_width + 1.2 * LAYOUT_SCALE
 
-                c.setFont("Times-Roman", toc_title_size)
+                c.setFont(FONT_REGULAR, toc_title_size)
                 c.drawRightString(page_right_x, y, page_num)
 
             y -= toc_line_height
 
         # ── Author names below title (italic, smaller) ──
         if author_lines:
-            c.setFont("Times-Italic", 7.5)
+            c.setFont(FONT_ITALIC, toc_author_size)
             for al in author_lines:
                 c.drawString(LEFT_MARGIN, y, al)
-                y -= 9.5
+                y -= toc_author_pitch
 
         # Record bottom of entry and save metadata for hyperlink
-        entry_bottom_rl = y - 2.0
+        # (y is already one line below the last author line: stop just under its descenders
+        # so this link never overlaps the next entry's title)
+        entry_bottom_rl = y + toc_author_pitch * 6.5 / 9.5
         fitz_x0 = LEFT_MARGIN - 2.0
         fitz_x1 = PAGE_WIDTH - RIGHT_MARGIN + 2.0
         fitz_y0 = max(0.0, PAGE_HEIGHT - entry_top_rl)
@@ -1798,7 +2433,7 @@ def generate_toc_pdf(papers, page_map, output_path):
                 'rect_fitz': (fitz_x0, fitz_y0, fitz_x1, fitz_y1),
             })
 
-        y -= 6  # clean gap before next entry
+        y -= TOC_ENTRY_GAP  # clean gap before next entry
 
     _draw_toc_footer(c)
     c.save()
@@ -1807,13 +2442,13 @@ def generate_toc_pdf(papers, page_map, output_path):
 
 def _draw_toc_header(canvas):
     """Draw conference header on TOC continuation pages."""
-    canvas.setFont("Times-Italic", HEADER_FONT_SIZE)
-    header_y = PAGE_HEIGHT - 38
+    canvas.setFont(FONT_ITALIC, HEADER_FONT_SIZE)
+    header_y = PAGE_HEIGHT - 38 * LAYOUT_SCALE
     canvas.drawString(LEFT_MARGIN, header_y, CONFERENCE_HEADER)
 
     canvas.setStrokeColor(DIVIDER_COLOR)
     canvas.setLineWidth(1.2)
-    header_line_y = header_y - 9
+    header_line_y = header_y - 9 * LAYOUT_SCALE
     canvas.line(LEFT_MARGIN, header_line_y,
                 PAGE_WIDTH - RIGHT_MARGIN, header_line_y)
 
@@ -1821,16 +2456,14 @@ def _draw_toc_header(canvas):
 def _draw_toc_footer(canvas):
     """Draw footer on a TOC page with deep blue divider."""
     # Deep blue footer divider line
-    footer_line_y = BOTTOM_MARGIN - 5
+    footer_line_y = BOTTOM_MARGIN - 5 * LAYOUT_SCALE
     canvas.setStrokeColor(DIVIDER_COLOR)
     canvas.setLineWidth(1.2)
     canvas.line(LEFT_MARGIN, footer_line_y, PAGE_WIDTH - RIGHT_MARGIN, footer_line_y)
 
     # Website (left-aligned)
-    footer_text_y = footer_line_y - 14
-    canvas.setFont("Times-Bold", FOOTER_URL_FONT_SIZE)
-    canvas.setFillColor(black)
-    canvas.drawString(LEFT_MARGIN, footer_text_y, FOOTER_URL)
+    footer_text_y = footer_line_y - 14 * LAYOUT_SCALE
+    _draw_footer_url(canvas, footer_text_y)
 
 
 def _word_wrap(text, font_name, font_size, max_width):
@@ -2605,6 +3238,48 @@ def _inject_word_toc_hyperlinks(docx_path, papers):
         print(f"  [WARN] Could not inject Word TOC hyperlinks: {e}")
 
 
+def _restore_word_superscripts(docx_path, papers=None):
+    """
+    pdf2docx turns author affiliation superscripts into plain, smaller runs, so Word shows
+    "Risha Fatima1". Re-mark a short number run as superscript when it is smaller than the
+    text it is attached to (after a name, or in front of an affiliation). Numbers that the
+    papers' text writes as subscripts (CO₂) are re-marked as subscripts instead.
+    """
+    subscripts = set()
+    for paper in papers or []:
+        text = ' '.join(paper.get(k, '') for k in ('title', 'abstract', 'keywords'))
+        for m in re.finditer(r'([A-Za-z]+)([\u2080-\u2089]+)', text):
+            subscripts.add((m.group(1), ''.join(str(ord(c) - 0x2080) for c in m.group(2))))
+    try:
+        import docx
+        doc = docx.Document(docx_path)
+        changed = 0
+        for p in doc.paragraphs:
+            runs = p.runs
+            for i, r in enumerate(runs):
+                number = r.text.strip()
+                if not re.fullmatch(r'\d{1,2}(?:,\d{1,2})*\*?', number) or r.font.size is None:
+                    continue
+                prev_r = runs[i - 1] if i > 0 else None
+                next_r = runs[i + 1] if i + 1 < len(runs) else None
+                ref = None
+                if prev_r is not None and re.search(r'[A-Za-z.]$', prev_r.text):
+                    ref = prev_r
+                elif next_r is not None and re.match(r'[A-Za-z]', next_r.text):
+                    ref = next_r
+                if ref is not None and ref.font.size and r.font.size < ref.font.size:
+                    if ref is prev_r and any(prev_r.text.endswith(f) and number == n for f, n in subscripts):
+                        r.font.subscript = True
+                    else:
+                        r.font.superscript = True
+                    r.font.size = ref.font.size
+                    changed += 1
+        if changed:
+            doc.save(docx_path)
+    except Exception as e:
+        print(f"  [WARN] Could not restore Word superscripts: {e}")
+
+
 def convert_pdf_to_word(pdf_path, docx_path, papers=None):
     """
     Converts the compiled PDF directly to Word (.docx) format using pdf2docx,
@@ -2618,13 +3293,39 @@ def convert_pdf_to_word(pdf_path, docx_path, papers=None):
 
         from pdf2docx import Converter
         print(f"\n[PROCESS] Converting compiled PDF -> Word (.docx)...")
-        cv = Converter(pdf_path)
-        cv.convert(docx_path, start=0, end=None)
-        cv.close()
+        # pdf2docx caps page margins at 1 inch, so a binding strip that widens the left margin
+        # breaks its centring detection: convert without the strip, then add it back in Word.
+        strip = max(0.0, LEFT_MARGIN - RIGHT_MARGIN)
+        source = pdf_path
+        if strip:
+            import tempfile
+            fd, source = tempfile.mkstemp(suffix='.pdf')
+            os.close(fd)
+            cropped = fitz.open(pdf_path)
+            for page in cropped:
+                page.set_cropbox(fitz.Rect(strip, 0, page.rect.width, page.rect.height))
+            cropped.save(source)
+            cropped.close()
+        try:
+            cv = Converter(source)
+            cv.convert(docx_path, start=0, end=None)
+            cv.close()
+        finally:
+            if source != pdf_path:
+                os.remove(source)
+        if strip:
+            import docx
+            from docx.shared import Pt
+            doc = docx.Document(docx_path)
+            for section in doc.sections:
+                section.page_width += Pt(strip)
+                section.left_margin += Pt(strip)
+            doc.save(docx_path)
 
         # ── Inject Clickable TOC Hyperlinks & Bookmarks in Word (.docx) ──
         if papers:
             _inject_word_toc_hyperlinks(docx_path, papers)
+        _restore_word_superscripts(docx_path, papers)
 
         print(f"  [OK] Successfully converted PDF to Word: {docx_path}")
         return True
@@ -2814,6 +3515,10 @@ def main():
     if not papers:
         print("\n[ERROR] No papers could be extracted! Check the PDFs.")
         sys.exit(1)
+
+    corrected = apply_paper_corrections(papers)
+    if corrected:
+        print(f"\n[CORRECTIONS] Applied edited text to {corrected} paper(s) from {os.path.basename(PAPER_CORRECTIONS_FILE)}")
 
     print(f"\n{'='*60}")
     print(f"[SUMMARY] EXTRACTION SUMMARY")
